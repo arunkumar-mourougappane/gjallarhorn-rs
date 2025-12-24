@@ -6,7 +6,7 @@ Thank you for your interest in contributing to **Gjallarhorn**! We welcome contr
 
 ### Prerequisites
 
-To build and run Heimdall-rs, you need a standard Rust environment and a few system libraries.
+To build and run Gjallarhorn, you need a standard Rust environment and a few system libraries.
 
 1. **Rust**: Install the latest stable Rust toolchain via [rustup](https://rustup.rs/).
 2. **System Libraries** (Linux):
@@ -19,8 +19,8 @@ To build and run Heimdall-rs, you need a standard Rust environment and a few sys
 Clone the repository:
 
 ```bash
-git clone https://github.com/arunkumar-mourougappane/heimdall-rs.git
-cd heimdall-rs
+git clone https://github.com/arunkumar-mourougappane/gjallarhorn-rs.git
+cd gjallarhorn-rs
 ```
 
 ## Development Workflow

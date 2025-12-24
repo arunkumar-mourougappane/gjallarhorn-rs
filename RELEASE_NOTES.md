@@ -42,8 +42,8 @@ cargo install gjallarhorn
 ### From Source
 
 ```bash
-git clone https://github.com/arunkumar-mourougappane/heimdall-rs.git
-cd heimdall-rs
+git clone https://github.com/arunkumar-mourougappane/gjallarhorn-rs.git
+cd gjallarhorn-rs
 cargo install --path .
 ```
 
@@ -71,9 +71,9 @@ Then navigate using:
 
 ## 📝 Documentation
 
-- [README](https://github.com/arunkumar-mourougappane/heimdall-rs/blob/main/README.md)
-- [API Documentation](https://docs.rs/heimdall)
-- [Contributing Guide](https://github.com/arunkumar-mourougappane/heimdall-rs/blob/main/CONTRIBUTING.md)
+- [README](https://github.com/arunkumar-mourougappane/gjallarhorn-rs/blob/main/README.md)
+- [API Documentation](https://docs.rs/gjallarhorn)
+- [Contributing Guide](https://github.com/arunkumar-mourougappane/gjallarhorn-rs/blob/main/CONTRIBUTING.md)
 
 ## 🙏 Acknowledgments
 
@@ -89,11 +89,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🔗 Links
 
-- **Homepage**: <https://github.com/arunkumar-mourougappane/heimdall-rs>
+- **Homepage**: <https://github.com/arunkumar-mourougappane/gjallarhorn-rs>
 - **crates.io**: <https://crates.io/crates/gjallarhorn>
 - **Documentation**: <https://docs.rs/gjallarhorn>
-- **Issues**: <https://github.com/arunkumar-mourougappane/heimdall-rs/issues>
+- **Issues**: <https://github.com/arunkumar-mourougappane/gjallarhorn-rs/issues>
 
 ---
 
-**Full Changelog**: <https://github.com/arunkumar-mourougappane/heimdall-rs/blob/main/CHANGELOG.md>
+**Full Changelog**: <https://github.com/arunkumar-mourougappane/gjallarhorn-rs/blob/main/CHANGELOG.md>

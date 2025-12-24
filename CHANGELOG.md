@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Color customization for all chart types (CPU, RAM, GPU, Network)
   - CPU color modes: Uniform (single color) or Per-Core (hue-based random colors)
   - Persistent settings that save automatically and restore on startup
-  - Configuration stored in standard system directories (`~/.config/heimdall/config.json`)
+  - Configuration stored in standard system directories (`~/.config/gjallarhorn/config.json`)
 
 - **Developer Features**
   - Comprehensive inline documentation (rustdoc comments)
@@ -36,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Code formatted with rustfmt
 
 - **Distribution**
-  - Installable as a binary via `cargo install heimdall`
+  - Installable as a binary via `cargo install gjallarhorn`
   - Complete crates.io metadata (homepage, documentation, keywords, categories)
   - Professional README with badges and installation instructions
   - Contributing guidelines (CONTRIBUTING.md)
@@ -61,4 +61,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `directories` 6.0.0 for cross-platform config paths
   - `log` & `env_logger` for structured logging
 
-[0.1.0]: https://github.com/arunkumar-mourougappane/heimdall-rs/releases/tag/v0.1.0
+[0.1.0]: https://github.com/arunkumar-mourougappane/gjallarhorn-rs/releases/tag/v0.1.0

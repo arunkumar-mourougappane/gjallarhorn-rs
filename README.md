@@ -38,12 +38,12 @@
 ### Install from Source
 
 ```bash
-git clone https://github.com/arunkumar-mourougappane/heimdall-rs.git
-cd heimdall-rs
+git clone https://github.com/arunkumar-mourougappane/gjallarhorn-rs.git
+cd gjallarhorn-rs
 cargo install --path .
 ```
 
-This will compile and install the `heimdall` binary to `~/.cargo/bin/` (make sure this is in your PATH).
+This will compile and install the `gjallarhorn` binary to `~/.cargo/bin/` (make sure this is in your PATH).
 
 ### Install from crates.io
 
@@ -56,8 +56,8 @@ cargo install gjallarhorn
 ### Building from Source (Development)
 
 ```bash
-git clone https://github.com/arunkumar-mourougappane/heimdall-rs.git
-cd heimdall-rs
+git clone https://github.com/arunkumar-mourougappane/gjallarhorn-rs.git
+cd gjallarhorn-rs
 cargo run --release
 ```
 
