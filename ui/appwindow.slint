@@ -1,0 +1,931 @@
+import { VerticalBox, HorizontalBox, Button, ScrollView, ListView } from "std-widgets.slint";
+
+// Data structure representing a single CPU core or generic usage metric.
+export struct CpuData {
+    usage_str: string,      // Formatted usage string (e.g., "CPU 1: 45%")
+    path_commands: string,  // SVG path commands for the line chart
+    color: brush,           // Color associated with this metric
+}
+
+// Reusable Line Chart component.
+// Renders a path based on provided SVG commands and includes a background grid.
+component LineChart inherits Rectangle {
+    in property <string> path-commands;       // The SVG path data
+    in property <brush> line-color: blue;     // Color of the line
+    in property <brush> bg-color: #f0f0f0;    // Background color of the chart area
+    in property <brush> chart-border-color: #cccccc; // Border color
+    in property <string> title: "";           // Optional title displayed in the corner
+    in property <brush> text-color: black;    // Color of the title text
+
+    height: 100px;
+    background: root.bg-color;
+    border-color: root.chart-border-color;
+    border-width: 1px;
+
+    // Grid Lines (Static 4x4 grid)
+    Path {
+        stroke: root.chart-border-color.with-alpha(0.3);
+        stroke-width: 1px;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 100;
+        viewbox-height: 100;
+        commands: "M 0 25 L 100 25 M 0 50 L 100 50 M 0 75 L 100 75 M 25 0 L 25 100 M 50 0 L 50 100 M 75 0 L 75 100";
+    }
+
+    // The data line
+    Path {
+        commands: root.path-commands;
+        stroke: root.line-color;
+        stroke-width: 2px;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 60;  // 60 data points (seconds)
+        viewbox-height: 100; // 0-100% usage
+    }
+    
+    // Optional Title Overlay
+    if root.title != "" : Text {
+        x: 5px;
+        y: 5px;
+        text: root.title;
+        color: root.text-color;
+        font-size: 12px;
+        font-weight: 700;
+    }
+}
+
+// A generic Card container with a title, rounded corners, and drop shadow.
+component Card inherits Rectangle {
+    in property <string> card-title;
+    in property <brush> bg-color;
+    in property <brush> card-border-color;
+    in property <brush> text-color;
+    
+    background: bg-color;
+    border-color: card-border-color;
+    border-width: 1px;
+    border-radius: 8px;
+    
+    // Subtle Shadow for depth
+    drop-shadow-blur: 15px;
+    drop-shadow-color: #00000020;
+    drop-shadow-offset-y: 4px;
+
+    VerticalBox {
+        padding: 15px;
+        spacing: 10px;
+        
+        Text {
+            text: root.card-title;
+            font-size: 18px;
+            font-weight: 700;
+            color: root.text-color;
+        }
+        
+        @children
+    }
+}
+
+// Button used for switching tabs in the content area.
+component TabButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <brush> text-color; 
+    callback clicked();
+    
+    width: 100px;
+    height: 40px;
+    border-radius: 4px;
+    background: root.active ? #3498db : (ta.has-hover ? #3498db.with-alpha(0.1) : #00000000);
+    
+    animate background { duration: 200ms; easing: ease-out; }
+
+    Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: root.text;
+        color: root.active ? #ffffff : root.text-color;
+        animate color { duration: 200ms; }
+    }
+    
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+// Sidebar navigation item with an active state indicator.
+component SideBarButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <brush> text-color;
+    callback clicked();
+    
+    height: 45px; // Slightly taller
+    background: root.active ? #3498db.with_alpha(0.15) : (ta.has-hover ? #3498db.with-alpha(0.05) : #00000000);
+    
+    animate background { duration: 200ms; easing: ease-out; }
+
+    // Active Indicator Line
+    if root.active : Rectangle {
+        x: 0;
+        y: 10px;
+        width: 3px;
+        height: parent.height - 20px;
+        background: #3498db;
+        border-radius: 2px;
+    }
+    
+    HorizontalBox {
+        padding-left: 15px; // More indentation
+        alignment: start;
+        Text {
+            vertical-alignment: center;
+            text: root.text;
+            color: root.active ? #3498db : root.text-color;
+            font-weight: root.active ? 700 : 400;
+            font-size: 14px;
+            animate color { duration: 200ms; }
+        }
+    }
+
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+// Button item for the top menu ribbon.
+component MenuButton inherits Rectangle {
+    in property <string> text;
+    in property <brush> text-color;
+    in property <bool> active: false;
+    callback clicked();
+
+    width: txt.preferred-width + 24px; // Dynamic width with padding
+    height: 30px; // Standard menu height
+    
+    background: root.active ? #ffffff.with-alpha(0.2) : (ta.has-hover ? #ffffff.with-alpha(0.1) : #00000000);
+    
+    animate background { duration: 150ms; }
+    
+    txt := Text {
+        text: root.text;
+        color: root.text-color;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        font-size: 13px;
+        font-weight: 500;
+        animate color { duration: 150ms; }
+    }
+    
+    ta := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+// Main content view displaying resource usage charts.
+// Handles switching between CPU, Memory, GPU, and Network tabs.
+component UsageView inherits VerticalBox {
+    in property <[CpuData]> cpus;
+    in property <string> memory-path;
+    in property <string> memory-label;
+    in property <[CpuData]> gpu-compute;
+    in property <[CpuData]> gpu-memory; 
+    in property <[CpuData]> networks;
+    
+    in property <brush> text-color;
+    in property <brush> card-bg;
+    in property <brush> card-border;
+    in property <brush> chart-bg;
+    in property <brush> chart-border;
+
+    // Theme Overrides
+    in property <brush> cpu-color;
+    in property <bool> use-uniform-cpu;
+    in property <brush> ram-color;
+    in property <brush> gpu-color;
+    in property <brush> net-color;
+
+    property <int> active-tab: 0;
+
+    padding: 20px;
+    spacing: 20px;
+
+    HorizontalBox {
+        spacing: 10px;
+        alignment: start;
+        
+        TabButton { text: "CPU"; active: root.active-tab == 0; text-color: root.text-color; clicked => { root.active-tab = 0; } }
+        TabButton { text: "RAM"; active: root.active-tab == 1; text-color: root.text-color; clicked => { root.active-tab = 1; } }
+        TabButton { text: "GPU"; active: root.active-tab == 2; text-color: root.text-color; clicked => { root.active-tab = 2; } }
+        TabButton { text: "Network"; active: root.active-tab == 3; text-color: root.text-color; clicked => { root.active-tab = 3; } }
+    }
+
+    Rectangle {
+        // CPU View
+        if root.active-tab == 0 : Card {
+            card-title: "CPU Usage (Per Core)";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            
+            Rectangle {
+                    vertical-stretch: 1;
+
+                    for cpu[i] in root.cpus : LineChart {
+                    x: (i - 4 * floor(i / 4)) * (self.width + 10px);
+                    y: floor(i / 4) * (self.height + 10px);
+                    width: (parent.width - 30px) / 4;
+                    height: (parent.height - 30px) / 4;
+                    path-commands: cpu.path-commands;
+                    line-color: root.use-uniform-cpu ? root.cpu-color : cpu.color; 
+                    bg-color: root.chart-bg;
+                    chart-border-color: root.chart-border;
+                    title: cpu.usage-str;
+                    text-color: root.text-color;
+                }
+            }
+        }
+
+
+        
+        // RAM View
+        if root.active-tab == 1 : Card {
+            card-title: "Memory Usage";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            
+            VerticalBox {
+                spacing: 10px;
+                Text { text: "System Memory: " + root.memory-label; color: root.text-color; }
+                LineChart {
+                    height: 200px;
+                    path-commands: root.memory-path;
+                    line-color: root.ram-color; // Override
+                    bg-color: root.chart-bg;
+                    chart-border-color: root.chart-border;
+                }
+                
+                Text { text: "GPU Memory"; font-size: 14px; font-weight: 700; color: root.text-color; }
+                ListView {
+                    for gpu in root.gpu-memory : VerticalBox {
+                            padding-bottom: 10px;
+                            Text { text: gpu.usage-str; color: root.text-color; font-size: 12px; }
+                            LineChart {
+                            height: 100px;
+                            path-commands: gpu.path-commands;
+                            line-color: root.gpu-color; // Override
+                            bg-color: root.chart-bg;
+                            chart-border-color: root.chart-border;
+                            }
+                    }
+                }
+            }
+        }
+        
+        // GPU View
+        if root.active-tab == 2 : Card {
+            card-title: "GPU Compute";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            
+            ListView {
+                for gpu in root.gpu-compute : VerticalBox {
+                        padding-bottom: 10px;
+                        Text { text: gpu.usage-str; color: root.text-color; }
+                        LineChart {
+                        height: 200px;
+                        path-commands: gpu.path-commands;
+                        line-color: root.gpu-color; // Override
+                        bg-color: root.chart-bg;
+                        chart-border-color: root.chart-border;
+                        }
+                }
+            }
+        }
+        
+        // Network View
+        if root.active-tab == 3 : Card {
+            card-title: "Network Interfaces";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            
+            ListView {
+                for net in root.networks : VerticalBox {
+                    padding-bottom: 15px;
+                    Text { 
+                        text: net.usage-str; 
+                        color: root.text-color; 
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+                    LineChart {
+                        width: 100%;
+                        height: 100px;
+                        path-commands: net.path-commands;
+                        line-color: root.net-color; // Override
+                        bg-color: root.chart-bg;
+                        chart-border-color: root.chart-border;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Selectable color circle for the color picker.
+component ColorSwatch inherits Rectangle {
+    in property <brush> swatch-color;
+    in property <bool> active;
+    callback clicked();
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    background: root.swatch-color;
+    border-color: root.active ? white : transparent;
+    border-width: root.active ? 2px : 0px;
+    
+    // Selection Ring
+    if root.active : Rectangle {
+        width: 34px;
+        height: 34px;
+        x: -2px; y: -2px;
+        border-radius: 17px;
+        border-color: root.swatch-color;
+        border-width: 2px;
+        background: transparent;
+    }
+    
+    TouchArea { clicked => { root.clicked(); } }
+}
+
+// A row of color swatches allowing the user to pick a predefined color.
+component ColorPicker inherits HorizontalBox {
+    in property <string> label;
+    in property <brush> current-color;
+    out property <brush> selected-color;
+    callback color-changed(brush);
+
+    spacing: 5px;
+    
+    Text { 
+        text: root.label; 
+        width: 80px; 
+        vertical-alignment: center; 
+        color: #888888;
+    }
+
+    // Predefined Palette
+    ColorSwatch { swatch-color: #e74c3c; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // Red
+    ColorSwatch { swatch-color: #e67e22; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // Orange
+    ColorSwatch { swatch-color: #f1c40f; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // Yellow
+    ColorSwatch { swatch-color: #2ecc71; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // Green
+    ColorSwatch { swatch-color: #3498db; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // Blue
+    ColorSwatch { swatch-color: #9b59b6; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // Purple
+    ColorSwatch { swatch-color: #ffffff; active: root.current-color == self.swatch-color; clicked => { root.color-changed(self.swatch-color); } } // White
+}
+
+// Dialog overlay for application settings.
+// Allows changing Dark Mode, CPU Uniformity, and Chart Colors.
+component PreferencesDialog inherits Rectangle {
+    in-out property <bool> dark-mode;
+    in-out property <bool> use-uniform-cpu;
+    in-out property <brush> cpu-color;
+    in-out property <brush> ram-color;
+    in-out property <brush> gpu-color;
+    in-out property <brush> net-color;
+    callback close();
+
+    background: #00000080; 
+    
+    TouchArea { clicked => { root.close(); } }
+
+    Rectangle {
+        width: 500px;
+        height: 550px;
+        background: root.dark-mode ? #1e1e1e : #ffffff;
+        border-radius: 8px;
+        border-color: root.dark-mode ? #333333 : #cccccc;
+        border-width: 1px;
+        
+        TouchArea {} // Block clicks
+
+        VerticalBox {
+            padding: 20px;
+            spacing: 20px;
+            alignment: start;
+
+            Text {
+                text: "Preferences";
+                font-size: 24px;
+                font-weight: 700;
+                color: root.dark-mode ? #e0e0e0 : #333333;
+            }
+            
+            Rectangle { height: 1px; background: #cccccc; width: 100%; }
+
+            // Dark Mode Toggle
+            HorizontalBox {
+                spacing: 10px;
+                Text { 
+                    text: "Dark Mode"; 
+                    vertical-alignment: center; 
+                    color: root.dark-mode ? #e0e0e0 : #333333;
+                    width: 120px;
+                }
+                Rectangle {
+                    width: 50px; height: 26px; border-radius: 13px;
+                    background: root.dark-mode ? #3498db : #cccccc;
+                    animate background { duration: 200ms; }
+                    
+                    Rectangle {
+                        x: root.dark-mode ? 26px : 2px;
+                        y: 2px;
+                        width: 22px; height: 22px; border-radius: 11px;
+                        background: white;
+                        animate x { duration: 200ms; easing: ease-out; }
+                    }
+                    TouchArea { clicked => { root.dark-mode = !root.dark-mode; } }
+                }
+            }
+            
+            Text { text: "CPU Colors"; font-weight: 700; color: root.dark-mode ? #e0e0e0 : #333333; }
+            
+             // Uniform CPU Toggle
+            HorizontalBox {
+                spacing: 10px;
+                Text { 
+                    text: "Uniform Color"; 
+                    vertical-alignment: center; 
+                    color: root.dark-mode ? #e0e0e0 : #333333;
+                    width: 120px;
+                }
+                Rectangle {
+                    width: 50px; height: 26px; border-radius: 13px;
+                    background: root.use-uniform-cpu ? #3498db : #cccccc;
+                    animate background { duration: 200ms; }
+                    
+                    Rectangle {
+                        x: root.use-uniform-cpu ? 26px : 2px;
+                        y: 2px;
+                        width: 22px; height: 22px; border-radius: 11px;
+                        background: white;
+                        animate x { duration: 200ms; easing: ease-out; }
+                    }
+                    TouchArea { clicked => { root.use-uniform-cpu = !root.use-uniform-cpu; } }
+                }
+            }
+
+            if root.use-uniform-cpu : ColorPicker { 
+                label: "CPU Color"; 
+                current-color: root.cpu-color; 
+                color-changed(c) => { root.cpu-color = c; } 
+            }
+            
+            Text { text: "Other Colors"; font-weight: 700; color: root.dark-mode ? #e0e0e0 : #333333; }
+
+            ColorPicker { 
+                label: "Memory"; 
+                current-color: root.ram-color; 
+                color-changed(c) => { root.ram-color = c; } 
+            }
+            ColorPicker { 
+                label: "GPU"; 
+                current-color: root.gpu-color; 
+                color-changed(c) => { root.gpu-color = c; } 
+            }
+            ColorPicker { 
+                label: "Network"; 
+                current-color: root.net-color; 
+                color-changed(c) => { root.net-color = c; } 
+            }
+
+            Rectangle { vertical-stretch: 1; } // Spacer
+
+            HorizontalBox {
+                alignment: end;
+                Button {
+                    text: "Close";
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}
+
+// Dialog overlay displaying application text and author info.
+// Dialog overlay displaying application text and author info.
+component AboutDialog inherits Rectangle {
+    in property <string> author;
+    in property <string> email;
+    in property <string> version;
+    callback close();
+
+    background: #00000080; 
+    
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    Rectangle {
+        width: 450px;
+        height: 400px; // Increased height
+        background: white; 
+        border-radius: 12px; // Softer corners
+        
+        TouchArea {} // Block clicks from closing
+
+        VerticalBox {
+            padding: 30px;
+            spacing: 10px;
+            alignment: start;
+
+            // Header
+            Text {
+                text: "Heimdall-rs";
+                font-size: 28px;
+                font-weight: 800;
+                horizontal-alignment: center;
+                color: #2c3e50;
+            }
+            
+            Text {
+                text: "v" + root.version;
+                font-size: 14px;
+                color: #7f8c8d;
+                horizontal-alignment: center;
+            }
+            
+            Rectangle { height: 10px; } // Spacer
+
+            // Description
+            Text {
+                text: "A modern, cross-platform system resource monitor.\nBuilt for speed and aesthetics.";
+                font-size: 14px;
+                color: #34495e;
+                horizontal-alignment: center;
+                wrap: word-wrap;
+            }
+            
+            Rectangle { height: 15px; } // Spacer
+            Rectangle { height: 1px; background: #ecf0f1; width: 100%; }
+            Rectangle { height: 15px; } // Spacer
+
+            // Author Info
+            Text {
+                text: "Created by " + root.author;
+                font-size: 15px;
+                font-weight: 600;
+                horizontal-alignment: center;
+                color: #2c3e50;
+            }
+            
+            Text {
+                text: "Embedded Software Engineer";
+                font-size: 12px;
+                color: #7f8c8d;
+                horizontal-alignment: center;
+            }
+             Text {
+                text: "github.com/arunkumar-mourougappane";
+                font-size: 12px;
+                color: #3498db; // Link color
+                horizontal-alignment: center;
+            }
+            
+            Text {
+                text: root.email;
+                font-size: 12px;
+                color: #95a5a6;
+                horizontal-alignment: center;
+            }
+
+            Rectangle { vertical-stretch: 1; } // Push button to bottom
+
+            // License
+            Text {
+                text: "Released under MIT License";
+                font-size: 10px;
+                color: #bdc3c7;
+                horizontal-alignment: center;
+            }
+
+            Button {
+                text: "Close";
+                clicked => { root.close(); }
+                height: 35px;
+                primary: true;
+            }
+        }
+    }
+}
+
+// The main application window.
+// Contains the Menu Ribbon, Sidebar, and Content Area.
+// Manages global state including theme properties and dialog visibility.
+export component AppWindow inherits Window {
+    title: "Heimdall Resource Monitor";
+    preferred-width: 900px;
+    preferred-height: 900px;
+    min-width: 800px;
+    min-height: 600px;
+    
+    callback quit();
+    callback save-prefs();
+
+    in property <[CpuData]> cpus;
+    in property <string> memory-path;
+    in property <string> memory-label;
+    
+    // GPU Properties
+    in property <[CpuData]> gpu-compute;
+    in property <[CpuData]> gpu-memory; 
+    
+    // Network Properties
+    in property <[CpuData]> networks;
+    
+    // Theme properties (Persistable in future)
+    in-out property <bool> dark-mode: false;
+    in-out property <bool> use-uniform-cpu: false;
+    in property <string> version;
+
+    in-out property <brush> cpu-chart-color: #3498db;
+    in-out property <brush> ram-chart-color: #2ecc71;
+    in-out property <brush> gpu-chart-color: #9b59b6;
+    in-out property <brush> net-chart-color: #e67e22;
+
+    property <int> active-section: 0; // 0: Usage
+    property <bool> show-about: false;
+    property <bool> show-help-menu: false;
+    property <bool> show-file-menu: false;
+    property <bool> show-preferences: false;
+    
+    property <brush> background-color: root.dark-mode ? #121212 : #f5f5f5;
+    property <brush> text-color: root.dark-mode ? #e0e0e0 : #333333;
+    property <brush> card-bg: root.dark-mode ? #1e1e1e : #ffffff;
+    property <brush> card-border: root.dark-mode ? #333333 : #e0e0e0;
+    property <brush> chart-bg: root.dark-mode ? #2d2d2d : #fafafa;
+    property <brush> chart-border: root.dark-mode ? #444444 : #cccccc;
+    
+    property <brush> menu-bg: root.dark-mode ? #252525 : #dcdcdc; 
+
+    background: root.background-color;
+    
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        VerticalBox {
+            padding: 0px;
+            spacing: 0px;
+            
+            // Menu Ribbon
+            Rectangle {
+                height: 35px;
+                background: root.menu-bg;
+                border-width: 0px; 
+                
+                HorizontalBox {
+                    alignment: start;
+                    padding-left: 5px;
+                    spacing: 0px;
+                    
+                    file_btn := MenuButton { 
+                        text: "File"; 
+                        text-color: root.text-color;
+                        active: root.show-file-menu;
+                        clicked => { root.show-file-menu = !root.show-file-menu; }
+                    }
+                    help_btn := MenuButton { 
+                        text: "Help"; 
+                        text-color: root.text-color;
+                        active: root.show-help-menu;
+                        clicked => { root.show-help-menu = !root.show-help-menu; } 
+                    }
+                }
+                
+                // Bottom separator
+                Rectangle {
+                    y: parent.height - 1px;
+                    height: 1px;
+                    background: root.card-border;
+                    width: 100%;
+                }
+            }
+
+            // Header
+            Rectangle {
+                height: 60px;
+                background: root.card-bg;
+                
+                HorizontalBox {
+                    alignment: space-between;
+                    padding-left: 20px;
+                    padding-right: 20px;
+                    
+                    Text {
+                        text: "Heimdall Monitor";
+                        font-size: 24px;
+                        font-weight: 900;
+                        vertical-alignment: center;
+                        color: root.text-color;
+                    }
+                    // Dark Mode button removed (moved to Preferences)
+                }
+                
+                // Bottom Border
+                Rectangle {
+                    y: parent.height - 1px;
+                    height: 1px;
+                    background: root.card-border;
+                    width: 100%;
+                }
+            }
+
+            // Main Body
+            HorizontalBox {
+                spacing: 0px;
+                
+                // Sidebar
+                Rectangle {
+                    width: 200px;
+                    background: root.card-bg;
+                    
+                    // Right Border
+                    Rectangle {
+                        x: parent.width - 1px;
+                        width: 1px;
+                        background: root.card-border;
+                        height: 100%;
+                    }
+                    
+                    VerticalBox {
+                        padding-top: 20px;
+                        alignment: start;
+                        spacing: 5px;
+                        
+                        Text {
+                            text: "GROUPS";
+                            color: root.text-color.with-alpha(0.5);
+                            font-size: 11px;
+                            font-weight: 700;
+                        }
+
+                        SideBarButton {
+                            text: "Usage";
+                            active: root.active-section == 0;
+                            text-color: root.text-color;
+                            clicked => { root.active-section = 0; }
+                        }
+                    }
+                }
+
+                // Content Area
+                Rectangle {
+                    background: root.background-color;
+                    if root.active-section == 0 : UsageView {
+                        cpus: root.cpus;
+                        memory-path: root.memory-path;
+                        memory-label: root.memory-label;
+                        gpu-compute: root.gpu-compute;
+                        gpu-memory: root.gpu-memory;
+                        networks: root.networks;
+                        
+                        // Theme injection
+                        text-color: root.text-color;
+                        card-bg: root.card-bg;
+                        card-border: root.card-border;
+                        chart-bg: root.chart-bg;
+                        chart-border: root.chart-border;
+                        
+                        // Chart Colors (Override data models for uniform theming)
+                        use-uniform-cpu: root.use-uniform-cpu;
+                        cpu-color: root.cpu-chart-color;
+                        ram-color: root.ram-chart-color;
+                        gpu-color: root.gpu-chart-color;
+                        net-color: root.net-chart-color;
+                    }
+                }
+            }
+        }
+        
+        // Menu Blocker
+        if root.show-help-menu || root.show-file-menu : TouchArea {
+            width: 100%;
+            height: 100%;
+            clicked => { 
+                root.show-help-menu = false; 
+                root.show-file-menu = false;
+            }
+            z: 100;
+        }
+
+        // File Menu Dropdown
+        if root.show-file-menu : Rectangle {
+            x: file_btn.absolute-position.x;
+            y: file_btn.absolute-position.y + file_btn.height;
+            width: 150px;
+            height: 80px;
+            background: root.card-bg;
+            border-color: root.card-border;
+            border-width: 1px;
+            border-radius: 4px;
+            z: 101;
+            
+            drop-shadow-blur: 8px;
+            drop-shadow-color: #00000030;
+            drop-shadow-offset-y: 2px;
+            
+            VerticalBox {
+                padding: 0px; spacing: 0px;
+                
+                // Preferences
+                Rectangle {
+                    height: 40px;
+                    background: pref_ta.has-hover ? root.menu-bg : transparent;
+                    Text { x: 15px; vertical-alignment: center; text: "Preferences"; color: root.text-color; }
+                    pref_ta := TouchArea {
+                         clicked => {
+                             root.show-file-menu = false;
+                             root.show-preferences = true;
+                         }
+                    }
+                }
+                
+                // Quit
+                Rectangle {
+                    height: 40px;
+                    background: quit_ta.has-hover ? root.menu-bg : transparent;
+                    Text { x: 15px; vertical-alignment: center; text: "Quit"; color: root.text-color; }
+                    quit_ta := TouchArea {
+                         clicked => { root.quit(); }
+                    }
+                }
+            }
+        }
+
+        // Help Dropdown Menu
+        if root.show-help-menu : Rectangle {
+            x: help_btn.absolute-position.x;
+            y: help_btn.absolute-position.y + help_btn.height;
+            width: 150px;
+            height: 40px;
+            background: root.card-bg;
+            border-color: root.card-border;
+            border-width: 1px;
+            border-radius: 4px;
+            z: 101; 
+            
+            drop-shadow-blur: 8px;
+            drop-shadow-color: #00000030;
+            drop-shadow-offset-y: 2px;
+            
+            VerticalBox {
+                padding: 0px; spacing: 0px;
+                // Item: About
+                Rectangle {
+                    height: 40px;
+                    background: item_ta.has-hover ? root.menu-bg : transparent;
+                    
+                    Text {
+                        x: 15px;
+                        vertical-alignment: center;
+                        text: "About";
+                        color: root.text-color;
+                    }
+                    
+                    item_ta := TouchArea {
+                        clicked => {
+                            root.show-help-menu = false;
+                            root.show-about = true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Preferences Dialog Overlay
+        if root.show-preferences : PreferencesDialog {
+            width: 100%; height: 100%;
+            dark-mode <=> root.dark-mode;
+            cpu-color <=> root.cpu-chart-color;
+            ram-color <=> root.ram-chart-color;
+            gpu-color <=> root.gpu-chart-color;
+            net-color <=> root.net-chart-color;
+            close => { root.show-preferences = false; }
+        }
+
+        // About Dialog Overlay
+        if root.show-about : AboutDialog {
+            width: 100%;
+            height: 100%;
+            author: "Arunkumar Mourougappane";
+            email: "amouroug@buffalo.edu";
+            version: root.version;
+            close => { root.show-about = false; }
+        }
+    }
+}
