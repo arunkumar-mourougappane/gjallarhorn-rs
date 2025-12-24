@@ -44,7 +44,7 @@ impl Default for AppSettings {
 
 impl AppSettings {
     fn get_path() -> PathBuf {
-        if let Some(proj_dirs) = ProjectDirs::from("com", "heimdall", "heimdall-rs") {
+        if let Some(proj_dirs) = ProjectDirs::from("com", "heimdall", "heimdall") {
             let config_dir = proj_dirs.config_dir();
             if !config_dir.exists() {
                 let _ = fs::create_dir_all(config_dir);

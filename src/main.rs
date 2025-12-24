@@ -11,6 +11,7 @@
 //! The application uses a modular structure, delegating configuration to `settings.rs` and utilities to `utils.rs`.
 
 use default_net;
+use log::{error, info};
 use nvml_wrapper::Nvml;
 use slint::{Model, Timer, TimerMode};
 use std::rc::Rc;
@@ -32,6 +33,17 @@ include!(env!("SLINT_INCLUDE_GENERATED"));
 /// 4. Sets up a 1-second timer to refresh system stats.
 /// 5. Updates the UI models with real-time data.
 fn main() -> Result<(), slint::PlatformError> {
+    // Initialize logger with different levels based on build type
+    #[cfg(debug_assertions)]
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Info)
+        .init();
+
+    #[cfg(not(debug_assertions))]
+    env_logger::Builder::from_default_env()
+        .filter_level(log::LevelFilter::Error)
+        .init();
+
     let ui = AppWindow::new()?;
     // let ui_handle = ui.as_weak(); // Removed
 
@@ -48,7 +60,7 @@ fn main() -> Result<(), slint::PlatformError> {
     // Initial refresh to get CPU count
     system.refresh_cpu_all();
     let cpu_count = system.cpus().len();
-    println!("Heimdall detected {} CPU cores (logical).", cpu_count);
+    info!("Heimdall detected {} CPU cores (logical)", cpu_count);
 
     // History for each CPU
     let mut cpus_history: Vec<Vec<f32>> = vec![vec![0.0; 60]; cpu_count];
@@ -105,10 +117,10 @@ fn main() -> Result<(), slint::PlatformError> {
     if let Ok(nvml) = &nvml_result {
         if let Ok(count) = nvml.device_count() {
             gpu_count = count as usize;
-            println!("Heimdall detected {} GPU(s).", gpu_count);
+            info!("Heimdall detected {} GPU(s)", gpu_count);
         }
     } else {
-        println!(
+        error!(
             "NVML init failed (no NVIDIA GPU?): {:?}",
             nvml_result.as_ref().err()
         );
@@ -199,7 +211,7 @@ fn main() -> Result<(), slint::PlatformError> {
         current_settings.net_color = brush_to_hex(ui.get_net_chart_color());
 
         current_settings.save();
-        println!("Settings saved.");
+        info!("Settings saved");
     });
 
     let timer = Timer::default();

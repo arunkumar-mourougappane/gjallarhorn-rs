@@ -911,11 +911,15 @@ export component AppWindow inherits Window {
         if root.show-preferences : PreferencesDialog {
             width: 100%; height: 100%;
             dark-mode <=> root.dark-mode;
+            use-uniform-cpu <=> root.use-uniform-cpu;
             cpu-color <=> root.cpu-chart-color;
             ram-color <=> root.ram-chart-color;
             gpu-color <=> root.gpu-chart-color;
             net-color <=> root.net-chart-color;
-            close => { root.show-preferences = false; }
+            close => { 
+                root.save-prefs();
+                root.show-preferences = false; 
+            }
         }
 
         // About Dialog Overlay

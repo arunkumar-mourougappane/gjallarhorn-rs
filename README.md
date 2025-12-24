@@ -51,7 +51,7 @@ cargo run --release
 
 ## Configuration
 
-Settings are stored in your system's standard configuration directory (e.g., `~/.config/heimdall-rs/config.json` on Linux) and persist across sessions.
+Settings are stored in your system's standard configuration directory (e.g., `~/.config/heimdall/config.json` on Linux) and persist across sessions.
 
 ## Performance
 
