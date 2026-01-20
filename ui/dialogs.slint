@@ -1,0 +1,320 @@
+import {
+    VerticalBox,
+    HorizontalBox,
+    Button,
+    Slider,
+} from "std-widgets.slint";
+import { ColorPicker } from "components.slint";
+
+// Dialog overlay for application settings.
+// Allows changing Dark Mode, CPU Uniformity, and Chart Colors.
+export component PreferencesDialog inherits Rectangle {
+    in property <bool> open;
+    in-out property <bool> dark-mode;
+    in-out property <bool> use-uniform-cpu;
+    in-out property <brush> cpu-color;
+    in-out property <brush> ram-color;
+    in-out property <brush> gpu-color;
+    in-out property <brush> net-color;
+    in-out property <float> refresh-rate-ms;
+    callback close();
+
+    background: #00000080;
+    opacity: root.open ? 1.0 : 0.0;
+    visible: root.opacity > 0.01; // Hide when fully transparent to pass through clicks
+    animate opacity {
+        duration: 250ms;
+        easing: ease-in-out;
+    }
+
+    TouchArea {
+        enabled: root.open;
+        clicked => {
+            root.close();
+        }
+    }
+
+    Rectangle {
+        width: 500px;
+        height: 750px;
+        background: root.dark-mode ? #1e1e1e : #ffffff;
+        border-radius: 8px;
+        border-color: root.dark-mode ? #333333 : #cccccc;
+        border-width: 1px;
+        
+        // Entry Animation
+        y: root.open ? (parent.height - self.height) / 2 : (parent.height - self.height) / 2 + 50px;
+        opacity: root.open ? 1.0 : 0.0;
+        animate y {
+            duration: 300ms;
+            easing: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+        }
+        animate opacity {
+            duration: 300ms;
+            easing: ease-out;
+        }
+
+        TouchArea { } // Block clicks
+
+        VerticalBox {
+            padding: 20px;
+            spacing: 20px;
+            height: 100%;
+
+            Text {
+                text: "Preferences";
+                font-size: 24px;
+                font-weight: 700;
+                color: root.dark-mode ? #e0e0e0 : #333333;
+            }
+
+            Rectangle {
+                height: 1px;
+                background: #cccccc;
+                width: 100%;
+            }
+
+            // Refresh Rate
+            Text {
+                text: "Refresh Rate: " + floor(root.refresh-rate-ms) + "ms";
+                color: root.dark-mode ? #e0e0e0 : #333333;
+            }
+
+            Slider {
+                width: 100%;
+                minimum: 100;
+                maximum: 2000;
+                value <=> root.refresh-rate-ms;
+            }
+
+            Rectangle {
+                height: 1px;
+                background: #cccccc;
+                width: 100%;
+            }
+
+            // Dark Mode Toggle
+            HorizontalBox {
+                spacing: 10px;
+                Text {
+                    text: "Dark Mode";
+                    vertical-alignment: center;
+                    color: root.dark-mode ? #e0e0e0 : #333333;
+                    width: 120px;
+                }
+
+                Rectangle {
+                    width: 50px;
+                    height: 26px;
+                    border-radius: 13px;
+                    background: root.dark-mode ? #3498db : #cccccc;
+                    animate background { duration: 200ms; }
+                    Rectangle {
+                        x: root.dark-mode ? 26px : 2px;
+                        y: 2px;
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: white;
+                        animate x {
+                            duration: 300ms;
+                            easing: cubic-bezier(0.25, 1.5, 0.5, 1); // Bouncy
+                        }
+                    }
+
+                    TouchArea {
+                        clicked => {
+                            root.dark-mode = !root.dark-mode;
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: "CPU Colors";
+                font-weight: 700;
+                color: root.dark-mode ? #e0e0e0 : #333333;
+            }
+            
+             // Uniform CPU Toggle
+            HorizontalBox {
+                spacing: 10px;
+                Text {
+                    text: "Uniform Color";
+                    vertical-alignment: center;
+                    color: root.dark-mode ? #e0e0e0 : #333333;
+                    width: 120px;
+                }
+
+                Rectangle {
+                    width: 50px;
+                    height: 26px;
+                    border-radius: 13px;
+                    background: root.use-uniform-cpu ? #3498db : #cccccc;
+                    animate background { duration: 200ms; }
+                    Rectangle {
+                        x: root.use-uniform-cpu ? 26px : 2px;
+                        y: 2px;
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: white;
+                        animate x {
+                            duration: 300ms;
+                            easing: cubic-bezier(0.25, 1.5, 0.5, 1); // Bouncy
+                        }
+                    }
+
+                    TouchArea {
+                        clicked => {
+                            root.use-uniform-cpu = !root.use-uniform-cpu;
+                        }
+                    }
+                }
+            }
+
+            if root.use-uniform-cpu: ColorPicker {
+                label: "CPU Color";
+                current-color: root.cpu-color;
+                color-changed(c) => {
+                    root.cpu-color = c;
+                }
+            }
+            Text {
+                text: "Other Colors";
+                font-weight: 700;
+                color: root.dark-mode ? #e0e0e0 : #333333;
+            }
+
+            ColorPicker {
+                label: "Memory";
+                current-color: root.ram-color;
+                color-changed(c) => {
+                    root.ram-color = c;
+                }
+            }
+
+            ColorPicker {
+                label: "GPU";
+                current-color: root.gpu-color;
+                color-changed(c) => {
+                    root.gpu-color = c;
+                }
+            }
+
+            ColorPicker {
+                label: "Network";
+                current-color: root.net-color;
+                color-changed(c) => {
+                    root.net-color = c;
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+            } // Spacer
+
+            HorizontalBox {
+                alignment: end;
+                Rectangle {
+                    width: 100px;
+                    height: 35px;
+                    border-radius: 4px;
+                    background: ta-save.has-hover ? #2980b9 : #3498db; // Darker blue on hover
+                    animate background { duration: 150ms; }
+                    Text {
+                        text: "Save";
+                        color: white;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+
+                    ta-save := TouchArea {
+                        clicked => {
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Dialog overlay displaying application text and author info.
+export component AboutDialog inherits Rectangle {
+    in property <string> author;
+    in property <string> email;
+    in property <string> version;
+    in property <bool> dark-mode;
+    callback close();
+
+    background: #00000080;
+    TouchArea {
+        clicked => {
+            root.close();
+        }
+    }
+
+    Rectangle {
+        width: 400px;
+        height: 300px;
+        background: root.dark-mode ? #1e1e1e : #ffffff;
+        border-radius: 8px;
+        border-color: root.dark-mode ? #333333 : #cccccc;
+        border-width: 1px;
+
+        VerticalBox {
+            padding: 20px;
+            alignment: center;
+            spacing: 15px;
+
+            Text {
+                text: "Gjallarhorn";
+                font-size: 28px;
+                font-weight: 700;
+                color: root.dark-mode ? #e0e0e0 : #333333;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: "Version " + root.version;
+                font-size: 14px;
+                color: root.dark-mode ? #aaaaaa : #666666;
+                horizontal-alignment: center;
+            }
+
+            Rectangle {
+                height: 10px;
+            } // Spacer
+
+            Text {
+                text: "Created by " + root.author;
+                font-size: 14px;
+                color: root.dark-mode ? #e0e0e0 : #333333;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: root.email;
+                font-size: 14px;
+                color: #3498db;
+                horizontal-alignment: center;
+            }
+
+            Rectangle {
+                height: 10px;
+            } // Spacer
+
+            HorizontalBox {
+                alignment: end;
+                Button {
+                    text: "Close";
+                    clicked => {
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+}

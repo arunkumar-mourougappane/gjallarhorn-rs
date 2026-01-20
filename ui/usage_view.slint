@@ -1,0 +1,265 @@
+import {
+    VerticalBox,
+    HorizontalBox,
+    ListView,
+} from "std-widgets.slint";
+import { CpuData, DiskData } from "structs.slint";
+import { Card, LineChart, TabButton } from "components.slint";
+
+// Main content view displaying resource usage charts.
+// Handles switching between CPU, Memory, GPU, and Network tabs.
+export component UsageView inherits VerticalBox {
+    in property <[CpuData]> cpus;
+    in property <string> memory-path;
+    in property <string> memory-label;
+    in property <[CpuData]> gpu-compute;
+    in property <[CpuData]> gpu-memory;
+    in property <[CpuData]> networks;
+    in property <[DiskData]> disks;
+    in property <brush> text-color;
+    in property <brush> card-bg;
+    in property <brush> card-border;
+    in property <brush> chart-bg;
+    in property <brush> chart-border;
+
+    // Theme Overrides
+    in property <brush> cpu-color;
+    in property <bool> use-uniform-cpu;
+    in property <brush> ram-color;
+    in property <brush> gpu-color;
+    in property <brush> net-color;
+
+    property <int> active-tab: 0;
+
+    padding: 20px;
+    spacing: 20px;
+
+    HorizontalBox {
+        spacing: 10px;
+        alignment: start;
+        TabButton {
+            text: "CPU";
+            active: root.active-tab == 0;
+            text-color: root.text-color;
+            clicked => {
+                root.active-tab = 0;
+            }
+        }
+
+        TabButton {
+            text: "RAM";
+            active: root.active-tab == 1;
+            text-color: root.text-color;
+            clicked => {
+                root.active-tab = 1;
+            }
+        }
+
+        TabButton {
+            text: "GPU";
+            active: root.active-tab == 2;
+            text-color: root.text-color;
+            clicked => {
+                root.active-tab = 2;
+            }
+        }
+
+        TabButton {
+            text: "Network";
+            active: root.active-tab == 3;
+            text-color: root.text-color;
+            clicked => {
+                root.active-tab = 3;
+            }
+        }
+
+        TabButton {
+            text: "Storage";
+            active: root.active-tab == 4;
+            text-color: root.text-color;
+            clicked => {
+                root.active-tab = 4;
+            }
+        }
+    }
+
+    Rectangle {
+        // CPU View
+        if root.active-tab == 0: Card {
+            card-title: "CPU Usage (Per Core)";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            Rectangle {
+                vertical-stretch: 1;
+
+                for cpu[i] in root.cpus: LineChart {
+                    x: (i - 4 * floor(i / 4)) * (self.width + 10px);
+                    y: floor(i / 4) * (self.height + 10px);
+                    width: (parent.width - 30px) / 4;
+                    height: (parent.height - 30px) / 4;
+                    path-commands: cpu.path-commands;
+                    line-color: root.use-uniform-cpu ? root.cpu-color : cpu.color;
+                    bg-color: root.chart-bg;
+                    chart-border-color: root.chart-border;
+                    title: cpu.usage-str;
+                    text-color: root.text-color;
+                }
+            }
+        }
+
+        // RAM View
+        if root.active-tab == 1: Card {
+            card-title: "Memory Usage";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            VerticalBox {
+                spacing: 10px;
+                Text {
+                    text: "System Memory: " + root.memory-label;
+                    color: root.text-color;
+                }
+
+                LineChart {
+                    height: 200px;
+                    path-commands: root.memory-path;
+                    line-color: root.ram-color; // Override
+                    bg-color: root.chart-bg;
+                    chart-border-color: root.chart-border;
+                }
+
+                Text {
+                    text: "GPU Memory";
+                    font-size: 14px;
+                    font-weight: 700;
+                    color: root.text-color;
+                }
+
+                ListView {
+                    for gpu in root.gpu-memory: VerticalBox {
+                        padding-bottom: 10px;
+                        Text {
+                            text: gpu.usage-str;
+                            color: root.text-color;
+                            font-size: 12px;
+                        }
+
+                        LineChart {
+                            height: 100px;
+                            path-commands: gpu.path-commands;
+                            line-color: root.gpu-color; // Override
+                            bg-color: root.chart-bg;
+                            chart-border-color: root.chart-border;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // GPU View
+        if root.active-tab == 2: Card {
+            card-title: "GPU Compute";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            ListView {
+                for gpu in root.gpu-compute: VerticalBox {
+                    padding-bottom: 10px;
+                    Text {
+                        text: gpu.usage-str;
+                        color: root.text-color;
+                    }
+
+                    LineChart {
+                        height: 200px;
+                        path-commands: gpu.path-commands;
+                        line-color: root.gpu-color; // Override
+                        bg-color: root.chart-bg;
+                        chart-border-color: root.chart-border;
+                    }
+                }
+            }
+        }
+        
+        // Network View
+        if root.active-tab == 3: Card {
+            card-title: "Network Interfaces";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            ListView {
+                for net in root.networks: VerticalBox {
+                    padding-bottom: 15px;
+                    Text {
+                        text: net.usage-str;
+                        color: root.text-color;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                    }
+
+                    LineChart {
+                        width: 100%;
+                        height: 100px;
+                        path-commands: net.path-commands;
+                        line-color: root.net-color; // Override
+                        bg-color: root.chart-bg;
+                        chart-border-color: root.chart-border;
+                    }
+                }
+            }
+        }
+
+        // Storage View
+        if root.active-tab == 4: Card {
+            card-title: "Disk Usage";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
+            ListView {
+                for disk in root.disks: VerticalBox {
+                    padding-bottom: 20px;
+                    HorizontalBox {
+                        alignment: space-between;
+                        Text {
+                            text: disk.name + " (" + disk.mount_point + ")";
+                            color: root.text-color;
+                            font-size: 14px;
+                            font-weight: 700;
+                        }
+
+                        Text {
+                            text: disk.used + " / " + disk.total;
+                            color: root.text-color.with-alpha(0.7);
+                            font-size: 12px;
+                        }
+                    }
+
+                    // Progress Bar Background
+                    Rectangle {
+                        height: 10px;
+                        background: root.chart-bg;
+                        border-radius: 5px;
+                        width: 100%;
+                        border-width: 1px;
+                        border-color: root.chart-border;
+                        
+                        // Fill
+                        Rectangle {
+                            x: 0;
+                            y: 0;
+                            height: 100%;
+                            width: parent.width * disk.usage_factor;
+                            background: disk.bar_color;
+                            border-radius: 5px;
+                            animate width {
+                                duration: 500ms;
+                                easing: ease-out;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

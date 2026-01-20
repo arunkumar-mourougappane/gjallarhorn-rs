@@ -1,0 +1,286 @@
+import {
+    VerticalBox,
+    HorizontalBox,
+    Button,
+    Slider,
+} from "std-widgets.slint";
+
+// Reusable Line Chart component.
+// Renders a path based on provided SVG commands and includes a background grid.
+export component LineChart inherits Rectangle {
+    in property <string> path-commands;       // The SVG path data
+    in property <brush> line-color: blue;     // Color of the line
+    in property <brush> bg-color: #f0f0f0;    // Background color of the chart area
+    in property <brush> chart-border-color: #cccccc; // Border color
+    in property <string> title: "";           // Optional title displayed in the corner
+    in property <brush> text-color: black;    // Color of the title text
+
+    height: 100px;
+    background: root.bg-color;
+    border-color: root.chart-border-color;
+    border-width: 1px;
+
+    // Grid Lines (Static 4x4 grid)
+    Path {
+        stroke: root.chart-border-color.with-alpha(0.3);
+        stroke-width: 1px;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 100;
+        viewbox-height: 100;
+        commands: "M 0 25 L 100 25 M 0 50 L 100 50 M 0 75 L 100 75 M 25 0 L 25 100 M 50 0 L 50 100 M 75 0 L 75 100";
+    }
+
+    // The data line
+    Path {
+        commands: root.path-commands;
+        stroke: root.line-color;
+        stroke-width: 2px;
+        viewbox-x: 0;
+        viewbox-y: 0;
+        viewbox-width: 60;  // 60 data points (seconds)
+        viewbox-height: 100; // 0-100% usage
+    }
+    
+    // Optional Title Overlay
+    if root.title != "": Text {
+        x: 5px;
+        y: 5px;
+        text: root.title;
+        color: root.text-color;
+        font-size: 12px;
+        font-weight: 700;
+    }
+}
+
+// A generic Card container with a title, rounded corners, and drop shadow.
+export component Card inherits Rectangle {
+    in property <string> card-title;
+    in property <brush> bg-color;
+    in property <brush> card-border-color;
+    in property <brush> text-color;
+    background: bg-color;
+    border-color: card-border-color;
+    border-width: 1px;
+    border-radius: 8px;
+    
+    // Subtle Shadow for depth
+    drop-shadow-blur: 15px;
+    drop-shadow-color: #00000020;
+    drop-shadow-offset-y: 4px;
+
+    VerticalBox {
+        padding: 15px;
+        spacing: 10px;
+        Text {
+            text: root.card-title;
+            font-size: 18px;
+            font-weight: 700;
+            color: root.text-color;
+        }
+
+        @children
+    }
+}
+
+// Button used for switching tabs in the content area.
+export component TabButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <brush> text-color;
+    callback clicked();
+    width: 100px;
+    height: 40px;
+    border-radius: 4px;
+    background: root.active ? #3498db : (ta.has-hover ? #3498db.with-alpha(0.1) : #00000000);
+    animate background {
+        duration: 200ms;
+        easing: ease-out;
+    }
+
+    Text {
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        text: root.text;
+        color: root.active ? #ffffff : root.text-color;
+        animate color { duration: 200ms; }
+    }
+
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// Sidebar navigation item with an active state indicator.
+export component SideBarButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    in property <brush> text-color;
+    callback clicked();
+    height: 45px; // Slightly taller
+    background: root.active ? #3498db.with_alpha(0.15) : (ta.has-hover ? #3498db.with-alpha(0.05) : #00000000);
+    animate background {
+        duration: 200ms;
+        easing: ease-out;
+    }
+
+    // Active Indicator Line
+    if root.active: Rectangle {
+        x: 0;
+        y: 10px;
+        width: 3px;
+        height: parent.height - 20px;
+        background: #3498db;
+        border-radius: 2px;
+    }
+    HorizontalBox {
+        padding-left: 15px; // More indentation
+        alignment: start;
+        Text {
+            vertical-alignment: center;
+            text: root.text;
+            color: root.active ? #3498db : root.text-color;
+            font-weight: root.active ? 700 : 400;
+            font-size: 14px;
+            animate color { duration: 200ms; }
+        }
+    }
+
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// Button item for the top menu ribbon.
+export component MenuButton inherits Rectangle {
+    in property <string> text;
+    in property <brush> text-color;
+    in property <bool> active: false;
+    callback clicked();
+
+    width: txt.preferred-width + 24px; // Dynamic width with padding
+    height: 30px; // Standard menu height
+    
+    background: root.active ? #ffffff.with-alpha(0.2) : (ta.has-hover ? #ffffff.with-alpha(0.1) : #00000000);
+    animate background { duration: 150ms; }
+    txt := Text {
+        text: root.text;
+        color: root.text-color;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        font-size: 13px;
+        font-weight: 500;
+        animate color { duration: 150ms; }
+    }
+
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// Selectable color circle for the color picker.
+export component ColorSwatch inherits Rectangle {
+    in property <brush> swatch-color;
+    in property <bool> active;
+    callback clicked();
+    width: 30px;
+    height: 30px;
+    border-radius: 15px;
+    background: ta.has-hover ? root.swatch-color.brighter(0.3) : root.swatch-color;
+    animate background {
+        duration: 150ms;
+        easing: ease-out;
+    }
+    border-color: root.active ? white : transparent;
+    border-width: root.active ? 2px : 0px;
+    
+    // Selection Ring
+    if root.active: Rectangle {
+        width: 34px;
+        height: 34px;
+        x: -2px;
+        y: -2px;
+        border-radius: 17px;
+        border-color: root.swatch-color;
+        border-width: 2px;
+        background: transparent;
+    }
+    ta := TouchArea {
+        clicked => {
+            root.clicked();
+        }
+    }
+}
+
+// A row of color swatches allowing the user to pick a predefined color.
+export component ColorPicker inherits HorizontalBox {
+    in property <string> label;
+    in property <brush> current-color;
+    out property <brush> selected-color;
+    callback color-changed(brush);
+
+    spacing: 5px;
+    Text {
+        text: root.label;
+        width: 80px;
+        vertical-alignment: center;
+        color: #888888;
+    }
+
+    // Predefined Palette
+    ColorSwatch {
+        swatch-color: #e74c3c;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // Red
+    ColorSwatch {
+        swatch-color: #e67e22;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // Orange
+    ColorSwatch {
+        swatch-color: #f1c40f;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // Yellow
+    ColorSwatch {
+        swatch-color: #2ecc71;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // Green
+    ColorSwatch {
+        swatch-color: #3498db;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // Blue
+    ColorSwatch {
+        swatch-color: #9b59b6;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // Purple
+    ColorSwatch {
+        swatch-color: #ffffff;
+        active: root.current-color == self.swatch-color;
+        clicked => {
+            root.color-changed(self.swatch-color);
+        }
+    } // White
+}

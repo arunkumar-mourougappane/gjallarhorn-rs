@@ -1,0 +1,15 @@
+export struct CpuData {
+    usage_str: string,      // Formatted usage string (e.g., "CPU 1: 45%")
+    path_commands: string,  // SVG path commands for the line chart
+    color: brush,           // Color associated with this metric
+}
+
+export struct DiskData {
+    name: string,
+    mount_point: string,
+    total: string,
+    used: string,
+    usage_factor: float, // 0.0 to 1.0
+    text_color: brush,
+    bar_color: brush,
+}
