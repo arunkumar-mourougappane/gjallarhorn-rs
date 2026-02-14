@@ -12,7 +12,7 @@
 use log::{error, info};
 use nvml_wrapper::Nvml;
 use std::collections::VecDeque;
-use sysinfo::{CpuRefreshKind, Disks, MemoryRefreshKind, Networks, RefreshKind, System};
+use sysinfo::{Disks, Networks, System};
 
 /// Holds data for a single CPU core for external consumers
 #[allow(dead_code)]
@@ -72,7 +72,7 @@ pub struct CpuDetailedInfo {
     pub flags: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MemoryDetailedInfo {
     pub total_capacity: String,
     pub used_capacity: String,
@@ -82,7 +82,7 @@ pub struct MemoryDetailedInfo {
     pub module_count: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StorageDetailedInfo {
     pub device_name: String,
     pub model: String,
@@ -94,10 +94,14 @@ pub struct StorageDetailedInfo {
     pub health_status: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GpuDetailedInfo {
     pub name: String,
     pub vram_total: u64,
+    // ... (rest omitted, but replace block needs to be complete or targeted)
+    // Wait, I should target specific lines or reuse whole block.
+    // I'll use separate replacements for safety if possible? No, multi_replace.
+    // I'll target the derive lines.
     pub vram_used: u64,
     pub driver_version: String,
     pub temperature: Option<i32>,
@@ -108,7 +112,7 @@ pub struct GpuDetailedInfo {
     pub memory_utilization: Option<u32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct NetworkDetailedInfo {
     pub name: String,
     pub mac_address: String,
@@ -147,6 +151,9 @@ pub struct SystemMonitor {
     /// Maximum number of data points to keep in history buffers.
     /// Calculated based on refresh rate to maintain a 60-second window.
     pub max_history: usize,
+
+    // Privileged Data (Shared with UI)
+    pub privileged_data: std::sync::Arc<std::sync::Mutex<Option<crate::worker::PrivilegedData>>>,
 }
 
 impl SystemMonitor {
@@ -154,37 +161,61 @@ impl SystemMonitor {
     ///
     /// Initializes `sysinfo` components, detects NVIDIA GPUs via `nvml`, and pre-allocation
     /// history buffers based on the provided `refresh_rate_ms`.
-    ///
-    /// # Arguments
-    ///
-    /// * `refresh_rate_ms` - The update interval in milliseconds. Used to calculate the buffer size for a 60s window.
+    /// Also spawns the privileged worker process if possible.
     pub fn new(refresh_rate_ms: u64) -> Self {
-        let mut system = System::new_with_specifics(
-            RefreshKind::nothing()
-                .with_cpu(CpuRefreshKind::everything())
-                .with_memory(MemoryRefreshKind::everything()),
-        );
-
-        // Initial Refresh
-        system.refresh_cpu_all();
-        system.refresh_memory();
-
+        let mut system = System::new_all();
+        system.refresh_all();
         let disks = Disks::new_with_refreshed_list();
         let networks = Networks::new_with_refreshed_list();
 
-        let mut interface_names: Vec<String> = networks.keys().cloned().collect();
-        interface_names.sort();
+        // Privileged Data Holder
+        let privileged_data = std::sync::Arc::new(std::sync::Mutex::new(None));
+        let privileged_data_clone = privileged_data.clone();
 
-        let nvml = match Nvml::init() {
-            Ok(n) => {
-                info!("NVML Initialized");
-                Some(n)
+        // Spawn Worker Thread
+        std::thread::spawn(move || {
+            let exe = std::env::current_exe().unwrap();
+            // Try to spawn worker via pkexec
+            // Note: pkexec might prompt for password.
+            if let Ok(mut child) = std::process::Command::new("pkexec")
+                .arg(exe)
+                .arg("--privileged-worker")
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::null()) // suppress errors or redirect?
+                .spawn()
+            {
+                if let Some(stdout) = child.stdout.take() {
+                    let reader = std::io::BufReader::new(stdout);
+                    use std::io::BufRead;
+                    for line in reader.lines() {
+                        if let Ok(json) = line {
+                            if let Ok(data) =
+                                serde_json::from_str::<crate::worker::PrivilegedData>(&json)
+                            {
+                                if let Ok(mut guard) = privileged_data_clone.lock() {
+                                    *guard = Some(data);
+                                }
+                            }
+                        }
+                    }
+                }
+                let _ = child.wait();
+            } else {
+                error!("Failed to spawn privileged worker via pkexec.");
             }
+        });
+
+        // Initialize NVML
+        let nvml = match Nvml::init() {
+            Ok(n) => Some(n),
             Err(e) => {
-                error!("NVML Init failed: {:?}", e);
+                error!("NVML Init failed: {}", e);
                 None
             }
         };
+
+        let mut interface_names: Vec<String> = networks.keys().cloned().collect();
+        interface_names.sort();
 
         let cpu_count = system.cpus().len();
         // 60 seconds * (1000 / ms) updates/second
@@ -209,6 +240,7 @@ impl SystemMonitor {
             net_history: vec![VecDeque::from(vec![0.0; max_history]); interface_names.len()],
             interface_names,
             max_history,
+            privileged_data,
         }
     }
 
@@ -836,7 +868,6 @@ impl SystemMonitor {
                             }
                         }
                     }
-
                     module_count += 1;
                 }
             } else {
@@ -863,142 +894,24 @@ impl SystemMonitor {
 
     /// Get detailed storage information for all physical disks
     pub fn get_storage_detailed_info(&self) -> Vec<StorageDetailedInfo> {
-        let mut storage_devices = Vec::new();
-        let physical_disks = Self::get_physical_disks();
-
-        for (device_name, model, capacity_bytes) in physical_disks {
-            // Determine interface type
-            let interface_type = if device_name.starts_with("nvme") {
-                // NVMe device - try to determine PCIe generation
-                let link_speed_path = format!(
-                    "/sys/class/block/{}/device/device/current_link_speed",
-                    device_name
-                );
-                let link_speed = std::fs::read_to_string(&link_speed_path)
-                    .unwrap_or_else(|_| "Unknown".to_string())
-                    .trim()
-                    .to_string();
-
-                if link_speed.contains("16") {
-                    "NVMe PCIe 4.0".to_string()
-                } else if link_speed.contains("8") {
-                    "NVMe PCIe 3.0".to_string()
-                } else if link_speed.contains("32") {
-                    "NVMe PCIe 5.0".to_string()
-                } else {
-                    "NVMe".to_string()
-                }
-            } else if device_name.starts_with("sd") {
-                // SATA device
-                "SATA".to_string()
-            } else if device_name.starts_with("vd") {
-                // Virtual device
-                "VirtIO".to_string()
-            } else {
-                "Unknown".to_string()
-            };
-
-            // Check if SSD (rotational = 0 means SSD)
-            let rotational_path = format!("/sys/class/block/{}/queue/rotational", device_name);
-            let is_ssd = std::fs::read_to_string(&rotational_path)
-                .ok()
-                .and_then(|s| s.trim().parse::<u8>().ok())
-                .map(|v| v == 0)
-                .unwrap_or(true); // Default to SSD if unknown (modern safe bet)
-
-            // Attempt to get Serial and Firmware from sysfs as fallback
-            let mut serial_number =
-                std::fs::read_to_string(format!("/sys/class/block/{}/device/serial", device_name))
-                    .unwrap_or_else(|_| "Unknown".to_string())
-                    .trim()
-                    .to_string();
-
-            let mut firmware_version =
-                std::fs::read_to_string(format!("/sys/class/block/{}/device/rev", device_name))
-                    .unwrap_or_else(|_| "Unknown".to_string())
-                    .trim()
-                    .to_string();
-
-            // NVMe firmware path check
-            if device_name.starts_with("nvme") && firmware_version == "Unknown" {
-                if let Ok(fw) = std::fs::read_to_string(format!(
-                    "/sys/class/block/{}/device/firmware_rev",
-                    device_name
-                )) {
-                    firmware_version = fw.trim().to_string();
+        // Try to get privileged data first
+        if let Ok(guard) = self.privileged_data.lock() {
+            if let Some(data) = &*guard {
+                if !data.storage.is_empty() {
+                    return data.storage.clone();
                 }
             }
-
-            // Health Status via smartctl
-            let mut health_status = "Unknown".to_string();
-
-            // Try smartctl --json -a /dev/{device_name}
-            // Note: smartctl requires root for most operations.
-            // If running as user, simple info usually fails, but we try.
-            if let Ok(output) = std::process::Command::new("smartctl")
-                .args(&["--json", "-a", &format!("/dev/{}", device_name)])
-                .output()
-            {
-                if output.status.success() {
-                    let json_str = String::from_utf8_lossy(&output.stdout);
-                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json_str) {
-                        // Serial
-                        if let Some(s) = v["serial_number"].as_str() {
-                            serial_number = s.to_string();
-                        }
-                        // Firmware
-                        if let Some(f) = v["firmware_version"].as_str() {
-                            firmware_version = f.to_string();
-                        }
-                        // Health (SMART)
-                        if let Some(passed) = v["smart_status"]["passed"].as_bool() {
-                            health_status = if passed {
-                                "Passed".to_string()
-                            } else {
-                                "Failed".to_string()
-                            };
-                        }
-                        // NVMe specific health check if generic failed or absent
-                        if health_status == "Unknown" {
-                            if let Some(nvme_health) =
-                                v["nvme_smart_health_information_log"]["critical_warning"].as_u64()
-                            {
-                                health_status = if nvme_health == 0 {
-                                    "Passed".to_string()
-                                } else {
-                                    "Warning".to_string()
-                                };
-                            }
-                        }
-
-                        // Temp (optional override or append)
-                        // if let Some(temp) = v["temperature"]["current"].as_i64() { ... }
-                    }
-                } else {
-                    // Check stderr for permission denied
-                    let stderr = String::from_utf8_lossy(&output.stderr);
-                    if stderr.contains("Permission denied") {
-                        health_status = "Root required".to_string();
-                    }
-                }
-            } else {
-                // smartctl not installed
-                health_status = "Install smartmontools".to_string();
-            }
-
-            storage_devices.push(StorageDetailedInfo {
-                device_name: device_name.clone(),
-                model,
-                capacity_bytes,
-                interface_type,
-                is_ssd,
-                serial_number,
-                firmware_version,
-                health_status,
-            });
         }
 
-        storage_devices
+        // Fallback to non-privileged gathering (or repetitive legacy logic)
+        // Since we extracted the headless logic, we can just call it?
+        // Wait, headless logic uses `sysinfo` or just `/sys/class/block`?
+        // `get_storage_detailed_info_headless` is static and does not use `self`.
+        // So we can just call it! It works for both.
+        // But wait, the "Legacy" logic inside `Monitor` had `self`? No, it just iterated `/sys`.
+        // So I can replace the entire body with:
+
+        crate::monitor::get_storage_detailed_info_headless()
     }
 
     /// Get detailed GPU information
@@ -1066,40 +979,206 @@ impl SystemMonitor {
 
     /// Get detailed network information
     pub fn get_network_detailed_info(&self) -> Vec<NetworkDetailedInfo> {
-        let mut networks_info = Vec::new();
-
-        for (interface_name, data) in &self.networks {
-            let mac_address = data.mac_address().to_string();
-
-            // IPs
-            let mut ip_v4 = "N/A".to_string();
-            let mut ip_v6 = "N/A".to_string();
-            for ip in data.ip_networks() {
-                match ip.addr {
-                    std::net::IpAddr::V4(addr) => ip_v4 = addr.to_string(),
-                    std::net::IpAddr::V6(addr) => ip_v6 = addr.to_string(),
+        // Try to get privileged data first
+        if let Ok(guard) = self.privileged_data.lock() {
+            if let Some(data) = &*guard {
+                if !data.network.is_empty() {
+                    return data.network.clone();
                 }
             }
-
-            // Link Speed
-            let speed_path = format!("/sys/class/net/{}/speed", interface_name);
-            let link_speed = std::fs::read_to_string(&speed_path)
-                .map(|s| format!("{} Mbps", s.trim()))
-                .unwrap_or("Unknown".to_string());
-
-            networks_info.push(NetworkDetailedInfo {
-                name: interface_name.clone(),
-                mac_address,
-                rx_bytes: data.total_received(),
-                tx_bytes: data.total_transmitted(),
-                rx_packets: data.total_packets_received(),
-                tx_packets: data.total_packets_transmitted(),
-                ip_v4,
-                ip_v6,
-                link_speed,
-            });
         }
-        networks_info.sort_by(|a, b| a.name.cmp(&b.name));
-        networks_info
+
+        // Fallback
+        crate::monitor::get_network_detailed_info_headless(&self.networks)
     }
+}
+// --- Standalone Data Gathering Functions (Reused by Worker) ---
+
+pub fn get_storage_detailed_info_headless() -> Vec<StorageDetailedInfo> {
+    let mut storage_devices = Vec::new();
+    // Read /sys/class/block for devices
+    let entries = match std::fs::read_dir("/sys/class/block") {
+        Ok(e) => e,
+        Err(_) => return Vec::new(),
+    };
+
+    for entry in entries.flatten() {
+        let device_name = entry.file_name().to_string_lossy().to_string();
+
+        // Filter: only physical disk-like devices (sd*, nvme*n1), exclude partitions (sd*1) and loop
+        if device_name.starts_with("loop")
+            || device_name.starts_with("ram")
+            || device_name.starts_with("sr")
+        {
+            continue;
+        }
+        // Exclude partitions: check if it ends with digit (for sd*) or p+digit (nvme)
+        // Heuristic: check if /sys/class/block/{name}/partition exists
+        let partition_path = format!("/sys/class/block/{}/partition", device_name);
+        if std::path::Path::new(&partition_path).exists() {
+            continue;
+        }
+
+        // Capacity
+        let size_path = format!("/sys/class/block/{}/size", device_name);
+        let capacity_sectors = std::fs::read_to_string(&size_path)
+            .unwrap_or("0".to_string())
+            .trim()
+            .parse::<u64>()
+            .unwrap_or(0);
+        let capacity_bytes = capacity_sectors * 512; // Standard sector size assumption
+
+        // Model
+        let model_path = format!("/sys/class/block/{}/device/model", device_name);
+        let mut model = std::fs::read_to_string(&model_path)
+            .unwrap_or("Unknown".to_string())
+            .trim()
+            .to_string();
+
+        if model == "Unknown" && device_name.starts_with("nvme") {
+            // NVMe model path
+            if let Ok(m) =
+                std::fs::read_to_string(format!("/sys/class/block/{}/device/model", device_name))
+            {
+                model = m.trim().to_string();
+            }
+        }
+
+        // Interface Type
+        let interface_type = if device_name.starts_with("nvme") {
+            "NVMe".to_string()
+        } else if device_name.starts_with("sd") {
+            "SATA".to_string()
+        } else if device_name.starts_with("vd") {
+            "VirtIO".to_string()
+        } else {
+            "Unknown".to_string()
+        };
+
+        // SSD Check
+        let rotational_path = format!("/sys/class/block/{}/queue/rotational", device_name);
+        let is_ssd = std::fs::read_to_string(&rotational_path)
+            .ok()
+            .and_then(|s| s.trim().parse::<u8>().ok())
+            .map(|v| v == 0)
+            .unwrap_or(true);
+
+        // Serial & Firmware (Fallback)
+        let mut serial_number =
+            std::fs::read_to_string(format!("/sys/class/block/{}/device/serial", device_name))
+                .unwrap_or("Unknown".to_string())
+                .trim()
+                .to_string();
+        let mut firmware_version =
+            std::fs::read_to_string(format!("/sys/class/block/{}/device/rev", device_name))
+                .unwrap_or("Unknown".to_string())
+                .trim()
+                .to_string();
+
+        if device_name.starts_with("nvme") && firmware_version == "Unknown" {
+            if let Ok(fw) = std::fs::read_to_string(format!(
+                "/sys/class/block/{}/device/firmware_rev",
+                device_name
+            )) {
+                firmware_version = fw.trim().to_string();
+            }
+        }
+
+        // Health via smartctl (Privileged part)
+        let mut health_status = "Unknown".to_string();
+
+        // Only try smartctl if we are likely root (headless fn implies usage by worker) or it's installed
+        // The worker will be root, so this should succeed.
+        if let Ok(output) = std::process::Command::new("smartctl")
+            .args(&["--json", "-a", &format!("/dev/{}", device_name)])
+            .output()
+        {
+            if output.status.success() {
+                let json_str = String::from_utf8_lossy(&output.stdout);
+                if let Ok(v) = serde_json::from_str::<serde_json::Value>(&json_str) {
+                    if let Some(s) = v["serial_number"].as_str() {
+                        serial_number = s.to_string();
+                    }
+                    if let Some(f) = v["firmware_version"].as_str() {
+                        firmware_version = f.to_string();
+                    }
+                    if let Some(passed) = v["smart_status"]["passed"].as_bool() {
+                        health_status = if passed {
+                            "Passed".to_string()
+                        } else {
+                            "Failed".to_string()
+                        };
+                    }
+                    if health_status == "Unknown" {
+                        if let Some(nvme_health) =
+                            v["nvme_smart_health_information_log"]["critical_warning"].as_u64()
+                        {
+                            health_status = if nvme_health == 0 {
+                                "Passed".to_string()
+                            } else {
+                                "Warning".to_string()
+                            };
+                        }
+                    }
+                }
+            } else {
+                // Even if failed, check permission
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                if stderr.contains("Permission denied") {
+                    health_status = "Root required".to_string();
+                }
+            }
+        } else {
+            health_status = "Smartctl not found".to_string();
+        }
+
+        storage_devices.push(StorageDetailedInfo {
+            device_name,
+            model,
+            capacity_bytes,
+            interface_type,
+            is_ssd,
+            serial_number,
+            firmware_version,
+            health_status,
+        });
+    }
+
+    storage_devices
+}
+
+pub fn get_network_detailed_info_headless(networks: &Networks) -> Vec<NetworkDetailedInfo> {
+    let mut networks_info = Vec::new();
+    for (interface_name, data) in networks {
+        // ... (Logic from get_network_detailed_info)
+        let mac_address = data.mac_address().to_string();
+
+        let mut ip_v4 = "N/A".to_string();
+        let mut ip_v6 = "N/A".to_string();
+        for ip in data.ip_networks() {
+            match ip.addr {
+                std::net::IpAddr::V4(addr) => ip_v4 = addr.to_string(),
+                std::net::IpAddr::V6(addr) => ip_v6 = addr.to_string(),
+            }
+        }
+
+        let speed_path = format!("/sys/class/net/{}/speed", interface_name);
+        let link_speed = std::fs::read_to_string(&speed_path)
+            .map(|s| format!("{} Mbps", s.trim()))
+            .unwrap_or("Unknown".to_string());
+
+        networks_info.push(NetworkDetailedInfo {
+            name: interface_name.clone(),
+            mac_address,
+            rx_bytes: data.total_received(),
+            tx_bytes: data.total_transmitted(),
+            rx_packets: data.total_packets_received(),
+            tx_packets: data.total_packets_transmitted(),
+            ip_v4,
+            ip_v6,
+            link_speed,
+        });
+    }
+    networks_info.sort_by(|a, b| a.name.cmp(&b.name));
+    networks_info
 }

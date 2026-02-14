@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Gjallarhorn
+Comment=Hardware Monitoring Tool
+Exec=gjallarhorn
+Icon=utilities-system-monitor
+Terminal=false
+Type=Application
+Categories=System;Monitor;
+Keywords=system;monitor;hardware;usage;

@@ -9,6 +9,7 @@ use std::rc::Rc;
 pub mod monitor;
 pub mod settings;
 pub mod utils;
+pub mod worker;
 
 use std::cell::RefCell;
 
