@@ -353,8 +353,7 @@ impl SystemMonitor {
     }
 
     pub fn get_cpu_count(&self) -> usize {
-        64 // Mocking 64 cores for UI scaling verification
-           // self.system.cpus().len()
+        self.system.cpus().len()
     }
 
     // Helper to get raw history as reference for UI generation
