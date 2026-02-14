@@ -9,7 +9,7 @@
 //! The `SystemMonitor` struct maintains historical data buffers (sliding windows)
 //! for each metric to facilitate real-time graph rendering.
 
-use log::{error, info};
+use log::error;
 use nvml_wrapper::Nvml;
 use std::collections::VecDeque;
 use sysinfo::{Disks, Networks, System};
