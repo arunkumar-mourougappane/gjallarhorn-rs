@@ -2,6 +2,7 @@ import {
     VerticalBox,
     HorizontalBox,
     ListView,
+    ScrollView,
 } from "std-widgets.slint";
 import { CpuData, DiskData } from "structs.slint";
 import { Card, LineChart, TabButton } from "components.slint";
@@ -90,20 +91,24 @@ export component UsageView inherits VerticalBox {
             bg-color: root.card-bg;
             card-border-color: root.card-border;
             text-color: root.text-color;
-            Rectangle {
+            ScrollView {
                 vertical-stretch: 1;
+                Rectangle {
+                    width: 100%;
+                    height: (floor((root.cpus.length + 3) / 4)) * 160px;
 
-                for cpu[i] in root.cpus: LineChart {
-                    x: (i - 4 * floor(i / 4)) * (self.width + 10px);
-                    y: floor(i / 4) * (self.height + 10px);
-                    width: (parent.width - 30px) / 4;
-                    height: (parent.height - 30px) / 4;
-                    path-commands: cpu.path-commands;
-                    line-color: root.use-uniform-cpu ? root.cpu-color : cpu.color;
-                    bg-color: root.chart-bg;
-                    chart-border-color: root.chart-border;
-                    title: cpu.usage-str;
-                    text-color: root.text-color;
+                    for cpu[i] in root.cpus: LineChart {
+                        x: (i - 4 * floor(i / 4)) * (self.width + 10px);
+                        y: floor(i / 4) * 160px;
+                        width: (parent.width - 30px) / 4;
+                        height: 150px;
+                        path-commands: cpu.path-commands;
+                        line-color: root.use-uniform-cpu ? root.cpu-color : cpu.color;
+                        bg-color: root.chart-bg;
+                        chart-border-color: root.chart-border;
+                        title: cpu.usage-str;
+                        text-color: root.text-color;
+                    }
                 }
             }
         }
