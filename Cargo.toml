@@ -1,6 +1,6 @@
 [package]
 name = "gjallarhorn"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Arunkumar Mourougappane <amouroug@buffalo.edu>"]
 edition = "2021"
 description = "Gjallarhorn - A modern, cross-platform system resource monitor written in Rust and Slint."

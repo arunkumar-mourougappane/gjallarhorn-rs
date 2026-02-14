@@ -5,6 +5,27 @@ All notable changes to Gjallarhorn will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-02-14
+
+### Added
+
+- **Privilege Separation Architecture**: Implemented Client-Worker model to separate GUI (unprivileged) from hardware monitoring (privileged).
+- **Detailed Hardware Info Tabs**: Added new sub-tabs for CPU, Memory, Storage, GPU, and Network detailed specifications.
+- **Worker Process**: Introduced `worker.rs` handle privileged tasks via `pkexec`.
+- **Deployment**: Added `Makefile` for installation and `gjallarhorn.desktop` file.
+- **Network Monitoring**: Added detailed per-interface bandwidth tracking.
+
+### Changed
+
+- **Refactoring**: Massive cleanup of `monitor.rs` for modularity and performance.
+- **Dependencies**: Updated `sysinfo` integration.
+- **Documentation**: Comprehensive updates to `README.md` and inline docs.
+
+### Fixed
+
+- **X11/Wayland Issues**: GUI no longer requires root, fixing display server compatibility.
+- **Code Quality**: Resolved all clippy warnings and optimized code paths.
+
 ## [0.1.0] - 2025-12-24
 
 ### Package Information
