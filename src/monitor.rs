@@ -187,14 +187,12 @@ impl SystemMonitor {
                 if let Some(stdout) = child.stdout.take() {
                     let reader = std::io::BufReader::new(stdout);
                     use std::io::BufRead;
-                    for line in reader.lines() {
-                        if let Ok(json) = line {
-                            if let Ok(data) =
-                                serde_json::from_str::<crate::worker::PrivilegedData>(&json)
-                            {
-                                if let Ok(mut guard) = privileged_data_clone.lock() {
-                                    *guard = Some(data);
-                                }
+                    for json in reader.lines().map_while(Result::ok) {
+                        if let Ok(data) =
+                            serde_json::from_str::<crate::worker::PrivilegedData>(&json)
+                        {
+                            if let Ok(mut guard) = privileged_data_clone.lock() {
+                                *guard = Some(data);
                             }
                         }
                     }
@@ -383,7 +381,7 @@ impl SystemMonitor {
         if let Some(nvml) = &self.nvml {
             if let Ok(count) = nvml.device_count() {
                 for i in 0..count {
-                    if let Ok(dev) = nvml.device_by_index(i as u32) {
+                    if let Ok(dev) = nvml.device_by_index(i) {
                         let name = dev.name().unwrap_or(format!("GPU {}", i));
                         let util = self
                             .gpu_util_history
@@ -472,6 +470,7 @@ impl SystemMonitor {
         res
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_static_info(
         &self,
     ) -> (
@@ -492,7 +491,7 @@ impl SystemMonitor {
     ) {
         let hostname = System::host_name().unwrap_or_else(|| "Unknown".to_string());
         let os_name = System::name().unwrap_or_else(|| "Unknown".to_string());
-        let os_ver = System::os_version().unwrap_or_else(|| "".to_string());
+        let os_ver = System::os_version().unwrap_or_default();
         let kernel = System::kernel_version().unwrap_or_else(|| "Unknown".to_string());
 
         let cpu_brand = self
@@ -526,7 +525,7 @@ impl SystemMonitor {
         if let Some(nvml) = &self.nvml {
             if let Ok(count) = nvml.device_count() {
                 for i in 0..count {
-                    if let Ok(dev) = nvml.device_by_index(i as u32) {
+                    if let Ok(dev) = nvml.device_by_index(i) {
                         let name = dev.name().unwrap_or_else(|_| format!("NVIDIA GPU {}", i));
                         let vram = if let Ok(mem_info) = dev.memory_info() {
                             let vram_gb = mem_info.total as f32 / 1024.0 / 1024.0 / 1024.0;
@@ -634,13 +633,13 @@ impl SystemMonitor {
                         && device_name
                             .chars()
                             .last()
-                            .map_or(false, |c| c.is_ascii_digit())
+                            .is_some_and(|c| c.is_ascii_digit())
                 } else if device_name.starts_with("sd") || device_name.starts_with("vd") {
                     // sda1, vda1 are partitions, sda, vda are not
                     device_name
                         .chars()
                         .last()
-                        .map_or(false, |c| c.is_ascii_digit())
+                        .is_some_and(|c| c.is_ascii_digit())
                 } else {
                     // Skip loop devices, ram, zram, etc.
                     continue;
@@ -723,7 +722,7 @@ impl SystemMonitor {
             .lines()
             .find(|line| line.starts_with("cache size"))
             .and_then(|line| line.split(':').nth(1))
-            .and_then(|s| s.trim().split_whitespace().next())
+            .and_then(|s| s.split_whitespace().next())
             .and_then(|s| s.parse::<usize>().ok())
             .unwrap_or(0);
 
@@ -833,7 +832,7 @@ impl SystemMonitor {
         let mut memory_type = "Unknown".to_string();
         let mut speed = "Unknown".to_string();
         let mut module_count = 0;
-        let channels;
+        // let channels; // Removed needless late init
 
         // Try dmidecode
         if let Ok(output) = std::process::Command::new("dmidecode")
@@ -880,7 +879,7 @@ impl SystemMonitor {
             speed = "Unknown".to_string();
         }
 
-        channels = module_count;
+        let channels = module_count;
 
         MemoryDetailedInfo {
             total_capacity,
@@ -921,7 +920,7 @@ impl SystemMonitor {
         if let Some(nvml) = &self.nvml {
             if let Ok(count) = nvml.device_count() {
                 for i in 0..count {
-                    if let Ok(dev) = nvml.device_by_index(i as u32) {
+                    if let Ok(dev) = nvml.device_by_index(i) {
                         let name = dev.name().unwrap_or_else(|_| format!("NVIDIA GPU {}", i));
 
                         // Memory info
@@ -1090,7 +1089,7 @@ pub fn get_storage_detailed_info_headless() -> Vec<StorageDetailedInfo> {
         // Only try smartctl if we are likely root (headless fn implies usage by worker) or it's installed
         // The worker will be root, so this should succeed.
         if let Ok(output) = std::process::Command::new("smartctl")
-            .args(&["--json", "-a", &format!("/dev/{}", device_name)])
+            .args(["--json", "-a", &format!("/dev/{}", device_name)])
             .output()
         {
             if output.status.success() {
