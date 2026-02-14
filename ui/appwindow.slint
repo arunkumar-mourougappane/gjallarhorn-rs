@@ -87,139 +87,144 @@ export component AppWindow inherits Window {
     callback save-prefs();
     callback quit();
 
-    HorizontalBox {
+    VerticalBox {
         padding: 0px;
         spacing: 0px;
 
-        // Side Navigation Bar
+        // Top Menu Ribbon (Now spans full width)
         Rectangle {
-            width: 200px;
-            background: root.sidebar-bg;
-            
-            // Sidebar Border
-            Rectangle {
-                width: 1px;
-                x: parent.width - 1px;
-                background: #cccccc;
-            }
-
-            VerticalBox {
-                padding: 10px;
+            height: 35px;
+            background: root.menu-bg;
+            HorizontalBox {
                 alignment: start;
                 spacing: 5px;
+                padding-left: 10px;
 
-                Text {
-                    text: "GJALLARHORN";
-                    font-size: 16px;
-                    font-weight: 800;
-                    color: root.text-color;
-                    horizontal-alignment: center;
-                    height: 50px;
-                    vertical-alignment: center;
-                }
-
-                SideBarButton {
-                    text: "Usage";
-                    active: root.active-section == 0;
+                MenuButton {
+                    text: "File";
                     text-color: root.text-color;
                     clicked => {
-                        root.active-section = 0;
+                        root.show-file-menu = !root.show-file-menu;
+                        root.show-help-menu = false; // Close others
                     }
                 }
 
-                SideBarButton {
-                    text: "Information";
-                    active: root.active-section == 1;
+                Rectangle {
+                    width: 20px;
+                } // Spacer
+
+                MenuButton {
+                    text: "Help";
                     text-color: root.text-color;
                     clicked => {
-                        root.active-section = 1;
+                        root.show-help-menu = !root.show-help-menu;
+                        root.show-file-menu = false; // Close others
                     }
                 }
             }
         }
 
-        // Main Content Area (Vertical Stack: Menu + Content)
-        VerticalBox {
+        HorizontalBox {
             padding: 0px;
             spacing: 0px;
 
-            // Top Menu Ribbon
+            // Side Navigation Bar
             Rectangle {
-                height: 35px;
-                background: root.menu-bg;
-                HorizontalBox {
+                width: 200px;
+                background: root.sidebar-bg;
+                
+                // Sidebar Border
+                Rectangle {
+                    width: 1px;
+                    x: parent.width - 1px;
+                    background: #cccccc;
+                }
+
+                VerticalBox {
+                    padding: 10px;
                     alignment: start;
                     spacing: 5px;
-                    padding-left: 10px;
 
-                    MenuButton {
-                        text: "File";
+                    Text {
+                        text: "GJALLARHORN";
+                        font-size: 16px;
+                        font-weight: 800;
+                        color: root.text-color;
+                        horizontal-alignment: center;
+                        height: 50px;
+                        vertical-alignment: center;
+                    }
+
+                    SideBarButton {
+                        text: "Usage";
+                        active: root.active-section == 0;
                         text-color: root.text-color;
                         clicked => {
-                            root.show-file-menu = !root.show-file-menu;
-                            root.show-help-menu = false; // Close others
+                            root.active-section = 0;
                         }
                     }
 
-                    Rectangle {
-                        width: 20px;
-                    } // Spacer
-
-                    MenuButton {
-                        text: "Help";
+                    SideBarButton {
+                        text: "Information";
+                        active: root.active-section == 1;
                         text-color: root.text-color;
                         clicked => {
-                            root.show-help-menu = !root.show-help-menu;
-                            root.show-file-menu = false; // Close others
+                            root.active-section = 1;
                         }
                     }
                 }
             }
 
-            // Main Content
-            if root.active-section == 0: UsageView {
-                cpus: root.cpus;
-                memory-path: root.memory-path;
-                memory-label: root.memory-label;
-                gpu-compute: root.gpu-compute;
-                gpu-memory: root.gpu-memory;
-                networks: root.networks;
-                disks: root.disks;
-                text-color: root.text-color;
-                card-bg: root.card-bg;
-                card-border: root.card-border;
-                chart-bg: root.chart-bg;
-                chart-border: root.chart-border;
-                cpu-color: root.cpu-chart-color;
-                use-uniform-cpu: root.use-uniform-cpu;
-                ram-color: root.ram-chart-color;
-                gpu-color: root.gpu-chart-color;
-                net-color: root.net-chart-color;
-            }
-            if root.active-section == 1: InformationView {
-                os-name: root.sys-os-name;
-                kernel-version: root.sys-kernel;
-                hostname: root.sys-hostname;
-                uptime: root.sys-uptime;
-                cpu-brand: root.sys-cpu-brand;
-                cpu-cores: root.sys-cpu-cores;
-                cpu-freq: root.sys-cpu-freq;
-                cpu-arch: root.sys-cpu-arch;
-                total-memory: root.sys-total-memory;
-                motherboard: root.sys-motherboard;
-                boot-mode: root.sys-boot-mode;
-                bios-version: root.sys-bios-version;
-                storage-total: root.sys-storage;
-                individual-disks: root.sys-disks;
-                gpu-names: root.sys-gpu-names;
-                text-color: root.text-color;
-                card-bg: root.card-bg;
-                card-border: root.card-border;
-                cpu-detailed-info: root.sys-cpu-detailed-info;
-                memory-detailed-info: root.sys-memory-detailed-info;
-                storage-detailed-info: root.sys-storage-detailed-info;
-                gpu-detailed-info: root.sys-gpu-detailed-info;
-                network-detailed-info: root.sys-network-detailed-info;
+            // Main Content Area
+            VerticalBox {
+                padding: 0px;
+                spacing: 0px;
+
+                // Main Content
+                if root.active-section == 0: UsageView {
+                    cpus: root.cpus;
+                    memory-path: root.memory-path;
+                    memory-label: root.memory-label;
+                    gpu-compute: root.gpu-compute;
+                    gpu-memory: root.gpu-memory;
+                    networks: root.networks;
+                    disks: root.disks;
+                    text-color: root.text-color;
+                    card-bg: root.card-bg;
+                    card-border: root.card-border;
+                    chart-bg: root.chart-bg;
+                    chart-border: root.chart-border;
+                    cpu-color: root.cpu-chart-color;
+                    use-uniform-cpu: root.use-uniform-cpu;
+                    ram-color: root.ram-chart-color;
+                    gpu-color: root.gpu-chart-color;
+                    net-color: root.net-chart-color;
+                }
+                if root.active-section == 1: InformationView {
+                    os-name: root.sys-os-name;
+                    kernel-version: root.sys-kernel;
+                    hostname: root.sys-hostname;
+                    uptime: root.sys-uptime;
+                    cpu-brand: root.sys-cpu-brand;
+                    cpu-cores: root.sys-cpu-cores;
+                    cpu-freq: root.sys-cpu-freq;
+                    cpu-arch: root.sys-cpu-arch;
+                    total-memory: root.sys-total-memory;
+                    motherboard: root.sys-motherboard;
+                    boot-mode: root.sys-boot-mode;
+                    bios-version: root.sys-bios-version;
+                    storage-total: root.sys-storage;
+                    individual-disks: root.sys-disks;
+                    gpu-names: root.sys-gpu-names;
+                    text-color: root.text-color;
+                    card-bg: root.card-bg;
+                    card-border: root.card-border;
+                    cpu-detailed-info: root.sys-cpu-detailed-info;
+                    memory-detailed-info: root.sys-memory-detailed-info;
+                    storage-detailed-info: root.sys-storage-detailed-info;
+                    gpu-detailed-info: root.sys-gpu-detailed-info;
+                    network-detailed-info: root.sys-network-detailed-info;
+                }
             }
         }
     }
@@ -228,7 +233,7 @@ export component AppWindow inherits Window {
     
     // File Dropdown
     if root.show-file-menu: Rectangle {
-        x: 210px; // Aligned with File button (200px sidebar + 10px padding)
+        x: 10px; // Aligned with File button (padding-left)
         y: 35px;
         width: 150px;
         height: 80px;
@@ -286,7 +291,7 @@ export component AppWindow inherits Window {
 
     // Help Dropdown
     if root.show-help-menu: Rectangle {
-        x: 230px; // Aligned with Help button approx
+        x: 60px; // Aligned with Help button approx (File width + Spacer)
         y: 35px;
         width: 120px;
         height: 40px;
