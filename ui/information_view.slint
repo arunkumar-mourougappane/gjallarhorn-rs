@@ -44,41 +44,77 @@ export component InformationView inherits VerticalBox {
     property <int> active-tab: 0;  // 0=Software, 1=Hardware
     property <int> hardware-subtab: 0;  // 0=CPU, 1=Memory, 2=Storage, 3=GPU, 4=Network
 
-    padding: 15px;
-    spacing: 4px;
+    padding: 20px;
+    spacing: 20px;
 
     // Main tab navigation
-    HorizontalBox {
-        alignment: start;
-        spacing: 4px;
-        TabButton {
-            text: "Software";
-            active: root.active-tab == 0;
-            text-color: root.text-color;
-            clicked => {
-                root.active-tab = 0;
-            }
-        }
+    // Main tab navigation (Segmented Control Style)
+    Rectangle {
+        height: 40px;
+        width: 300px; // Fixed width for the control
+        background: root.card-bg;
+        border-radius: 8px;
+        border-color: root.card-border;
+        border-width: 1px;
+        clip: true; // Ensure children don't overflow rounded corners
 
-        TabButton {
-            text: "Hardware";
-            active: root.active-tab == 1;
-            text-color: root.text-color;
-            clicked => {
-                root.active-tab = 1;
+        HorizontalLayout {
+            Rectangle {
+                // Software Button
+                width: 50%;
+                background: root.active-tab == 0 ? #3498db : transparent;
+                animate background { duration: 200ms; }
+                Text {
+                    text: "Software";
+                    color: root.active-tab == 0 ? #ffffff : root.text-color;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                    animate color { duration: 200ms; }
+                }
+
+                TouchArea {
+                    clicked => {
+                        root.active-tab = 0;
+                    }
+                }
+            }
+
+            Rectangle {
+                width: 1px;
+                background: root.card-border;
+            }
+
+            Rectangle {
+                // Hardware Button
+                width: 50%;
+                background: root.active-tab == 1 ? #3498db : transparent;
+                animate background { duration: 200ms; }
+
+                Text {
+                    text: "Hardware";
+                    color: root.active-tab == 1 ? #ffffff : root.text-color;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                    animate color { duration: 200ms; }
+                }
+
+                TouchArea {
+                    clicked => {
+                        root.active-tab = 1;
+                    }
+                }
             }
         }
     }
 
     // Software Tab Content
-    if root.active-tab == 0: Rectangle {
-        background: root.card-bg;
-        border-color: root.card-border;
-        border-width: 1px;
-        border-radius: 8px;
-        drop-shadow-blur: 15px;
-        drop-shadow-color: #00000020;
-        drop-shadow-offset-y: 4px;
+    if root.active-tab == 0: Card {
+        card-title: "Software Details";
+        bg-color: root.card-bg;
+        card-border-color: root.card-border;
+        text-color: root.text-color;
 
         VerticalLayout {
             padding: 12px;
@@ -243,27 +279,17 @@ export component InformationView inherits VerticalBox {
         }
 
         // CPU Sub-tab
-        if root.hardware-subtab == 0: Rectangle {
-            background: root.card-bg;
-            border-color: root.card-border;
-            border-width: 1px;
-            border-radius: 8px;
-            drop-shadow-blur: 15px;
-            drop-shadow-color: #00000020;
-            drop-shadow-offset-y: 4px;
+        if root.hardware-subtab == 0: Card {
+            card-title: "CPU Details";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
 
             ScrollView {
                 VerticalLayout {
-                    padding: 8px;
-                    spacing: 4px;
                     alignment: start;
-
-                    Text {
-                        text: "🔲 CPU Details";
-                        font-size: 16px;
-                        font-weight: 800;
-                        color: root.text-color;
-                    }
+                    padding: 0px; // Card has padding
+                    spacing: 4px;
 
                     // Basic Info Section
                     VerticalLayout {
@@ -457,27 +483,17 @@ export component InformationView inherits VerticalBox {
         }
 
         // Memory Sub-tab
-        if root.hardware-subtab == 1: Rectangle {
-            background: root.card-bg;
-            border-color: root.card-border;
-            border-width: 1px;
-            border-radius: 8px;
-            drop-shadow-blur: 15px;
-            drop-shadow-color: #00000020;
-            drop-shadow-offset-y: 4px;
+        if root.hardware-subtab == 1: Card {
+            card-title: "Memory Details";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
 
             ScrollView {
                 VerticalLayout {
-                    padding: 8px;
-                    spacing: 4px;
                     alignment: start;
-
-                    Text {
-                        text: "💾 Memory Details";
-                        font-size: 16px;
-                        font-weight: 800;
-                        color: root.text-color;
-                    }
+                    padding: 0px;
+                    spacing: 4px;
 
                     HorizontalLayout {
                         spacing: 12px;
@@ -591,40 +607,31 @@ export component InformationView inherits VerticalBox {
         }
 
         // Storage Sub-tab
-        if root.hardware-subtab == 2: Rectangle {
-            background: root.card-bg;
-            border-color: root.card-border;
-            border-width: 1px;
-            border-radius: 8px;
-            drop-shadow-blur: 15px;
-            drop-shadow-color: #00000020;
-            drop-shadow-offset-y: 4px;
+        if root.hardware-subtab == 2: Card {
+            card-title: "Storage Devices";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
 
             ScrollView {
                 VerticalLayout {
-                    padding: 8px;
-                    spacing: 4px;
                     alignment: start;
-
-                    Text {
-                        text: "💽 Storage Devices";
-                        font-size: 16px;
-                        font-weight: 800;
-                        color: root.text-color;
-                    }
+                    padding: 0px;
+                    spacing: 4px;
 
                     VerticalLayout {
                         spacing: 5px;
 
-                        // Header removed as list items explain themselves
-
-                        // Replaced by detailed list below
-
+                        // List Items
                         for device in root.storage-detailed-info: Rectangle {
-                            background: root.card-bg.darker(5%); // Slightly darker background for each device
+                            background: ta-storage.has-hover ? root.card-bg.darker(10%) : root.card-bg.darker(5%);
                             border-radius: 4px;
                             border-color: root.card-border;
                             border-width: 1px;
+                            animate background { duration: 150ms; }
+
+                            ta-storage := TouchArea { }
+
                             VerticalLayout {
                                 padding: 8px;
                                 spacing: 4px;
@@ -689,33 +696,26 @@ export component InformationView inherits VerticalBox {
         }
 
         // GPU Sub-tab
-        if root.hardware-subtab == 3: Rectangle {
-            background: root.card-bg;
-            border-color: root.card-border;
-            border-width: 1px;
-            border-radius: 8px;
-            drop-shadow-blur: 15px;
-            drop-shadow-color: #00000020;
-            drop-shadow-offset-y: 4px;
+        if root.hardware-subtab == 3: Card {
+            card-title: "GPU Details";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
 
             ScrollView {
                 VerticalLayout {
-                    padding: 8px;
-                    spacing: 4px;
                     alignment: start;
-
-                    Text {
-                        text: "🎮 GPU Details";
-                        font-size: 16px;
-                        font-weight: 800;
-                        color: root.text-color;
-                    }
+                    padding: 0px;
+                    spacing: 4px;
 
                     for gpu in root.gpu-detailed-info: Rectangle {
-                        background: root.card-bg.darker(5%);
+                        background: ta-gpu.has-hover ? root.card-bg.darker(10%) : root.card-bg.darker(5%);
                         border-radius: 4px;
                         border-color: root.card-border;
                         border-width: 1px;
+                        animate background { duration: 150ms; }
+                        ta-gpu := TouchArea { }
+
                         VerticalLayout {
                             padding: 8px;
                             spacing: 4px;
@@ -797,37 +797,30 @@ export component InformationView inherits VerticalBox {
         }
 
         // Network Sub-tab
-        if root.hardware-subtab == 4: Rectangle {
-            background: root.card-bg;
-            border-color: root.card-border;
-            border-width: 1px;
-            border-radius: 8px;
-            drop-shadow-blur: 15px;
-            drop-shadow-color: #00000020;
-            drop-shadow-offset-y: 4px;
+        if root.hardware-subtab == 4: Card {
+            card-title: "Network Interfaces";
+            bg-color: root.card-bg;
+            card-border-color: root.card-border;
+            text-color: root.text-color;
 
             ScrollView {
                 VerticalLayout {
-                    padding: 8px;
-                    spacing: 4px;
                     alignment: start;
-
-                    Text {
-                        text: "🌐 Network Interfaces";
-                        font-size: 16px;
-                        font-weight: 800;
-                        color: root.text-color;
-                    }
+                    padding: 0px;
+                    spacing: 4px;
 
                     for net in root.network-detailed-info: Rectangle {
-                        background: root.card-bg.darker(5%);
+                        background: ta-net.has-hover ? root.card-bg.darker(10%) : root.card-bg.darker(5%);
                         border-radius: 4px;
                         border-color: root.card-border;
                         border-width: 1px;
+                        animate background { duration: 150ms; }
+                        ta-net := TouchArea { }
+
                         VerticalLayout {
                             padding: 8px;
                             spacing: 4px;
-                            
+
                             // Name and MAC
                             HorizontalLayout {
                                 Text {
